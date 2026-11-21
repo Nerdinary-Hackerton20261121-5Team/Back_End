@@ -85,7 +85,7 @@ Back_End · Frontend · cluster-config 세 레포 README가 같은 표를 쓴다
 |---|---|
 | 서버 주소 | **dev** https://cmc-11th-dev.bemelon.me · **운영** https://cmc-11th.bemelon.me. 두 주소 모두 `/api/*`·`/docs*`는 BE로, 나머지는 FE로 가므로 FE와 API가 같은 origin이다 |
 | API · 문서 · 버전 확인 | `<주소>/api` · Swagger `<주소>/docs`(dev·운영 둘 다 열린다) · `<주소>/api/health` → 200 `{"status":"ok","commit":"<배포된 커밋 sha>"}`. `commit`으로 그 서버에 떠 있는 빌드를 확인한다 |
-| 브랜치 흐름 | 기능 브랜치 → PR(base `dev`) → `dev` 머지 = dev 서버 배포 → dev에서 확인 → `dev`→`main` PR → `main` 머지 = 운영 배포. Back_End·Frontend의 기본 브랜치는 `dev`이고 `dev`·`main`에 직접 push하지 않는다. cluster-config만 `main`에 직접 push한다 |
+| 브랜치 흐름 | 기능 브랜치 → PR(권장, base `dev`) → `dev` 머지 = dev 서버 배포 → dev에서 확인 → `dev`→`main` PR로 승격 → `main` 머지 = 운영 배포. Back_End·Frontend의 기본 브랜치는 `dev`이고, `dev`·`main` 모두 PR 승인은 필요 없다. 보호 규칙은 force push·브랜치 삭제 금지뿐이다. cluster-config는 `main`에 직접 push한다 |
 | 배포 | 앱 레포(Back_End·Frontend)에 push(머지)되면 GitHub Actions `Deploy`가 이미지 `registry.bemelon.me/cmc-11th/back_end:<커밋 sha>`(BE) 또는 `.../frontend:<커밋 sha>`(FE)를 올리고 [cluster-config](https://github.com/Nerdinary-Hackerton20261121-5Team/cluster-config)에 커밋한다. `dev` push → `apps/be-dev`·`apps/fe-dev`에 `deploy(be-dev)`·`deploy(fe-dev)`, `main` push → `apps/be`·`apps/fe`에 `deploy(be)`·`deploy(fe)`. 그 뒤 Argo CD가 자동 반영한다(보통 1~3분). 배포는 머지로만 일어나고 서버에 직접 올리는 일은 없다 |
 | 롤백 | cluster-config에서 해당 `deploy(...)` 커밋을 `git revert` 후 push (force push 금지). 앱 코드는 별도 PR로 고친다 |
 | 상태·로그 | Argo CD https://cmc-11th-argocd.bemelon.me · 계정 `cmc-11th` · 비밀번호는 운영자에게. 앱 6개(`cmc-11th-be`·`-fe`·`-be-dev`·`-fe-dev`·`-gateway`·`-mysql`)의 상태 조회·SYNC·파드 로그만 가능하다 |
