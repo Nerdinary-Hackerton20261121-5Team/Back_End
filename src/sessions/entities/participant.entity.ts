@@ -7,7 +7,6 @@ import {
   Unique,
   type ValueTransformer,
 } from 'typeorm';
-import { User } from '../../users/entities/user.entity.js';
 import { Session } from './session.entity.js';
 
 /** DECIMAL은 드라이버가 문자열로 주므로 number로 바꾼다 */
@@ -16,11 +15,10 @@ const decimalToNumber: ValueTransformer = {
   from: (value: string | null) => (value === null ? null : Number(value)),
 };
 
-/** 참가자. 비회원이면 user_id가 NULL이다. 토큰은 해시만 저장한다 (POL-003). */
+/** 참가자. 가입 없이 토큰으로 식별하며, 토큰은 해시만 저장한다 (POL-003). */
 @Entity({ name: 'participant', comment: '참가자' })
 @Unique('uk_participant_token', ['tokenHash'])
 @Unique('uk_participant_join_request', ['sessionId', 'joinRequestId'])
-@Unique('uk_participant_session_user', ['sessionId', 'userId'])
 export class Participant {
   @PrimaryGeneratedColumn({
     type: 'bigint',
@@ -38,21 +36,6 @@ export class Participant {
     foreignKeyConstraintName: 'fk_participant_session',
   })
   session?: Session;
-
-  @Column({
-    name: 'user_id',
-    type: 'bigint',
-    nullable: true,
-    comment: '유저 ID (비회원이면 NULL)',
-  })
-  userId: number | null;
-
-  @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({
-    name: 'user_id',
-    foreignKeyConstraintName: 'fk_participant_user',
-  })
-  user?: User | null;
 
   @Column({
     name: 'token_hash',

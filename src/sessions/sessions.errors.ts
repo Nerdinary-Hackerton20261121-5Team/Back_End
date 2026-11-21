@@ -27,6 +27,11 @@ export const SessionErrors = {
     status: HttpStatus.BAD_REQUEST,
     message: '최소 4명이 입장해야 시작할 수 있습니다.',
   },
+  IMAGE_LOCKED_AFTER_START: {
+    code: 'IMAGE_LOCKED_AFTER_START',
+    status: HttpStatus.CONFLICT,
+    message: '시작된 세션의 이미지는 바꿀 수 없습니다.',
+  },
   CANNOT_LEAVE_AFTER_START: {
     code: 'CANNOT_LEAVE_AFTER_START',
     status: HttpStatus.CONFLICT,
