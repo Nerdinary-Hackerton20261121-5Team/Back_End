@@ -18,7 +18,7 @@
 | `src/app.controller.ts`, `src/app.service.ts` | 샘플. 실제 기능은 `src/<기능>/` 모듈로 추가 | O |
 | `src/health/` | `GET /api/health` → 200 `{status, commit}`. 클러스터 probe가 쓰므로 경로·200 응답을 유지 | O |
 | `Dockerfile`, `.dockerignore` | 운영 이미지(포트 3000, `GIT_SHA` build-arg) | O |
-| `.github/workflows/` | `ci.yml` PR 검증, `deploy.yml` main 머지 시 ghcr push → cluster-config 태그 갱신 → Argo CD 배포 | O |
+| `.github/workflows/` | `ci.yml` PR 검증, `deploy.yml` main 머지 시 registry.bemelon.me/cmc-11th push → cluster-config 태그 갱신 → Argo CD 배포 | O |
 | `src/**/*.spec.ts` | 단위 테스트(코드 옆에 둠) | O |
 | `test/` | e2e 테스트 (`vitest.config.e2e.ts`) | O |
 | `docs/Coding/NESTJS.md` | NestJS 기술 지침 | O |
