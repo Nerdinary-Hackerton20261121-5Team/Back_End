@@ -99,10 +99,8 @@ NestJS 버전·ESM 규칙·테스트(Vitest)·Observe 관련 안내는 [NestJS �
 
 ### 브랜치·PR
 
-- `main`에서 딴 작업 브랜치(`feat/작업명`, `fix/작업명`, `docs/작업명`, `chore/작업명`, `ci/작업명`)에서 작업하고 PR로 합친다.
-  `main`에 직접 push하지 않는다(보호 브랜치, 승인 1명 필요). force push·rebase로 공유 이력을 고치지 않는다.
-- **PR의 base는 `main`이다.** GitHub 기본 브랜치 설정이 아직 `dev`라서 웹 PR 화면·`gh pr create`의 base가 `dev`로 잡힌다.
-  `dev`는 `main`보다 뒤처져 CI·Dockerfile·배포 워크플로가 없고 거기에 머지해도 배포되지 않으니 base를 `main`으로 바꿔서 연다.
+- 작업은 `main`에서 딴 브랜치(`feat/작업명`, `fix/작업명`, `docs/작업명`, `chore/작업명`, `ci/작업명`)에서 하고 **base를 `main`으로 해서 PR**을 연다(GitHub 기본 브랜치가 `main`이다).
+  `main`은 보호 브랜치라 직접 push하지 않고(승인 1명 필요) force push·rebase로 공유 이력을 고치지 않는다.
 - 커밋은 `종류: 내용` 형식(`feat`·`fix`·`docs`·`chore`·`ci`·`refactor`·`test`)으로 기능 단위로 나눈다.
   PR 본문은 `.github/PULL_REQUEST_TEMPLATE.md` 양식을 채우고 관련 이슈는 `closes #번호`로 잇는다.
 - 커밋·PR에 AI 공동작성자(Co-Authored-By)나 에이전트 도구 표기를 넣지 않는다.
@@ -132,7 +130,7 @@ NestJS 버전·ESM 규칙·테스트(Vitest)·Observe 관련 안내는 [NestJS �
 - `main.ts`의 `setGlobalPrefix('api')`를 유지한다. 게이트웨이가 `/api/*`를 경로 그대로 넘기고 `/api`를 떼지 않는다.
 - `GET /api/health`가 200 `{status, commit}`을 계속 돌려줘야 한다(`src/health/`). 파드의 probe가 이 경로를 쓰므로 없애거나 인증을 걸면 새 파드가 Ready가 되지 않고 롤링 업데이트가 멈춘다.
 - 컨테이너는 `PORT`(운영 3000)에서 받는다. `Dockerfile`의 포트·`GIT_SHA` build-arg를 유지한다.
-- DB 연결은 위 `DB_*` 환경변수 이름을 그대로 읽는다. 다른 이름을 만들면 운영에서 값이 들어오지 않는다.
+- DB 연결은 위 `DB_*` 환경변수 이름을 그대로 읽는다. 다른 이름을 만들면 운영에서 값이 들어오지 않는다. `DB_DATABASE` 값(`app`)은 클러스터가 주입하니 코드에 박지 않는다.
 - 운영 `CORS_ORIGIN`은 `https://cmc-11th.bemelon.me` 하나다. FE는 같은 origin이라 CORS 없이 `/api/...`를 부른다.
 - Swagger 문서(`/docs`)는 게이트웨이가 `/api/*`만 이 서버로 보내서 공개 주소로는 열리지 않는다. 공개 주소에서 보려면 경로를 `api/docs`로 옮긴다.
 
