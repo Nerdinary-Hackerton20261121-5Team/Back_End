@@ -35,11 +35,11 @@ describe('heartbeat·진행판 API (e2e)', () => {
   const sessions = () => dataSource.getRepository(Session);
   const participants = () => dataSource.getRepository(Participant);
 
-  /** 목표 goalSeconds, 2명 방을 만들고 시작한다 */
-  async function startedRoom(goalSeconds = 600) {
+  /** 목표 goalSeconds, people명(최소 4명) 방을 만들고 시작한다 */
+  async function startedRoom(goalSeconds = 600, people = 4) {
     const res = await http()
       .post('/api/sessions')
-      .send({ goalSeconds, maxParticipants: 4, clientRequestId: randomUUID() })
+      .send({ goalSeconds, maxParticipants: 6, clientRequestId: randomUUID() })
       .expect(201);
     const host = res.body.data as {
       sessionId: number;
@@ -54,6 +54,12 @@ describe('heartbeat·진행판 API (e2e)', () => {
         .send({ sessionCode: host.sessionCode, clientRequestId: randomUUID() })
         .expect(201)
     ).body.data as { participantId: number; participantToken: string };
+    for (let i = 2; i < people; i++) {
+      await http()
+        .post('/api/sessions/join')
+        .send({ sessionCode: host.sessionCode, clientRequestId: randomUUID() })
+        .expect(201);
+    }
     await http()
       .post(`/api/sessions/${host.sessionId}/start`)
       .set('X-Participant-Token', host.participantToken)
@@ -94,7 +100,7 @@ describe('heartbeat·진행판 API (e2e)', () => {
     expect(Date.now() - me.lastHeartbeatAt!.getTime()).toBeLessThan(5 * SEC);
   });
 
-  it('200 진행판: 원조각 2개, 내 복원도만 공개하고 남의 것은 null', async () => {
+  it('200 진행판: 4명이면 2×2, 내 복원도만 공개하고 남의 것은 null', async () => {
     const { host, sessionId } = await startedRoom(600);
     await rewind(sessionId, 150, 600); // 600초 중 150초 경과
     // 둘 다 방금까지 신호를 보낸 상태로 둔다 (연결 유지)
@@ -104,16 +110,30 @@ describe('heartbeat·진행판 API (e2e)', () => {
     const data = res.body.data;
     expect(data).toMatchObject({
       status: 'FOCUSING',
-      gridRows: 1,
+      gridRows: 2,
       gridCols: 2,
       myDisconnected: false,
     });
-    expect(data.pieces).toHaveLength(2);
+    expect(data.pieces).toHaveLength(4);
     const mine = data.pieces.find((p: { isMine: boolean }) => p.isMine);
-    const other = data.pieces.find((p: { isMine: boolean }) => !p.isMine);
+    const others = data.pieces.filter((p: { isMine: boolean }) => !p.isMine);
+    expect(mine).toMatchObject({ position: 1, colSpan: 1 });
     expect(mine.restoration).toBeCloseTo(0.25, 1);
-    expect(mine.rect).toEqual({ x: 0, y: 0, w: 0.5, h: 1 });
-    expect(other.restoration).toBeNull();
+    expect(mine).not.toHaveProperty('rect');
+    expect(
+      others.every(
+        (p: { restoration: number | null }) => p.restoration === null,
+      ),
+    ).toBe(true);
+  });
+
+  it('5명이면 3×2 격자, 5번 원조각만 두 칸(colSpan 2)', async () => {
+    const { host, sessionId } = await startedRoom(600, 5);
+    const res = await board(sessionId, host.participantToken).expect(200);
+    expect(res.body.data).toMatchObject({ gridRows: 3, gridCols: 2 });
+    expect(
+      res.body.data.pieces.map((p: { colSpan: number }) => p.colSpan),
+    ).toEqual([1, 1, 1, 1, 2]);
   });
 
   it('AC-016 기준 시간 넘게 신호가 없던 사람은 마지막 확인 시각으로 고정된다', async () => {
