@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -25,6 +26,7 @@ import {
   SessionDetailResponseDto,
   SessionEntryResponseDto,
 } from './dto/session-response.dto.js';
+import { DeleteSessionResponseDto } from './dto/delete-session-response.dto.js';
 import { StartSessionResponseDto } from './dto/start-session-response.dto.js';
 import { SessionStartService } from './session-start.service.js';
 import { SessionErrors } from './sessions.errors.js';
@@ -37,6 +39,26 @@ export class SessionsController {
     private readonly sessions: SessionsService,
     private readonly starter: SessionStartService,
   ) {}
+
+  @Delete(':sessionId')
+  @ParticipantAuth()
+  @ApiOperation({
+    summary: '방 종료·폐기 (개설자)',
+    description:
+      '세션과 참가자·조각 등 모든 자료를 지운다. 이후 이 방의 토큰으로 하는 요청은 401로 거절된다.',
+  })
+  @ApiSuccessResponse(DeleteSessionResponseDto)
+  @ApiErrorResponses(
+    CommonErrors.INVALID_INPUT,
+    SessionErrors.NOT_CREATOR,
+    SessionErrors.SESSION_NOT_FOUND,
+  )
+  remove(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @CurrentParticipant() me: RequestParticipant,
+  ): Promise<DeleteSessionResponseDto> {
+    return this.sessions.remove(sessionId, me);
+  }
 
   @Post(':sessionId/start')
   @HttpCode(HttpStatus.OK)
