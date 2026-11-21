@@ -118,14 +118,14 @@ export class StudyService {
       disconnectedAtById.set(p.id, disconnectedAt);
     }
 
-    const rects = sources.length
-      ? new Map(
-          buildPuzzleLayout(sources.length).sources.map((s) => [
+    const colSpans = new Map<number, number>(
+      sources.length
+        ? buildPuzzleLayout(sources.length).sources.map((s) => [
             s.position,
-            s.rect,
-          ]),
-        )
-      : new Map();
+            s.colSpan,
+          ])
+        : [],
+    );
     const revealAll = status === 'ASSEMBLING' || status === 'COMPLETED';
 
     const pieces = sources
@@ -134,7 +134,7 @@ export class StudyService {
         const isMine = source.participantId === me.participantId;
         return {
           position: source.position,
-          rect: rects.get(source.position),
+          colSpan: colSpans.get(source.position) ?? 1,
           isMine,
           // 집중 중 남의 조각은 블러로 보이도록 값을 내려주지 않는다 (실제 값은 서버가 계산 가능)
           restoration:

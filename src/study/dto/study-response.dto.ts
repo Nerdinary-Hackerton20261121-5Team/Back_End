@@ -35,26 +35,21 @@ export class HeartbeatResponseDto {
   serverNow: Date;
 }
 
-export class BoardRectDto {
-  @ApiProperty({ description: '왼쪽 위 x (이미지 너비 대비 0~1)', example: 0 })
-  x: number;
-
-  @ApiProperty({ description: '왼쪽 위 y (이미지 높이 대비 0~1)', example: 0 })
-  y: number;
-
-  @ApiProperty({ description: '너비 (0~1)', example: 0.5 })
-  w: number;
-
-  @ApiProperty({ description: '높이 (0~1)', example: 0.5 })
-  h: number;
-}
-
 export class BoardPieceDto {
-  @ApiProperty({ description: '원조각 위치 번호 (왼쪽 위부터 1)', example: 1 })
+  @ApiProperty({
+    description:
+      '원조각 위치 번호. 왼쪽 위부터 1, 한 행에 2칸 (gridRows × gridCols 격자)',
+    example: 1,
+  })
   position: number;
 
-  @ApiProperty({ type: BoardRectDto })
-  rect: BoardRectDto;
+  @ApiProperty({
+    description:
+      '격자에서 차지하는 칸 수. 5명일 때 마지막(5번) 원조각만 2(맨 아래 행 전체), 나머지는 1',
+    enum: [1, 2],
+    example: 1,
+  })
+  colSpan: number;
 
   @ApiProperty({ description: '내 원조각인지', example: true })
   isMine: boolean;
