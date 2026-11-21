@@ -3,6 +3,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import {
   DataSource,
   EntityManager,
+  Not,
   QueryFailedError,
   Repository,
 } from 'typeorm';
@@ -11,6 +12,10 @@ import type { RequestParticipant } from '../common/decorators/current-participan
 import { BusinessException } from '../common/exception/business.exception.js';
 import { CommonErrors } from '../common/exception/error-code.js';
 import { goalSecondsRange, SPLIT_COUNT } from '../config/policy.js';
+import type { ImageDto } from '../storage/dto/image.dto.js';
+import { Image } from '../storage/entities/image.entity.js';
+import { ImageErrors } from '../storage/images.errors.js';
+import { ImagesService } from '../storage/images.service.js';
 import {
   elapsedSeconds,
   remainingSeconds,
@@ -44,6 +49,7 @@ export class SessionsService {
     @InjectRepository(Session) private readonly sessions: Repository<Session>,
     @InjectRepository(Participant)
     private readonly participants: Repository<Participant>,
+    private readonly images: ImagesService,
   ) {}
 
   /** 방 만들기 (F-001, F-007). 개설자도 참가자로 등록하고 토큰을 발급한다. */
@@ -136,7 +142,10 @@ export class SessionsService {
     sessionId: number,
     me: RequestParticipant,
   ): Promise<SessionDetailResponseDto> {
-    const session = await this.sessions.findOne({ where: { id: sessionId } });
+    const session = await this.sessions.findOne({
+      where: { id: sessionId },
+      relations: { image: true },
+    });
     if (!session) throw new BusinessException(SessionErrors.SESSION_NOT_FOUND);
     const participantCount = await this.participants.count({
       where: { sessionId },
@@ -163,8 +172,51 @@ export class SessionsService {
       elapsedSeconds: elapsedSeconds(timer, now),
       remainingSeconds: remainingSeconds(timer, now),
       serverNow: now,
+      image: session.image ? this.images.toDto(session.image) : null,
       me: { participantId: me.participantId, isCreator: me.isCreator },
     };
+  }
+
+  /**
+   * 방 이미지 지정 (F-008). 개설자만, 시작 전에만 바꿀 수 있다.
+   * 세션 행을 잠가 시작과 한 줄로 세운다 (시작 뒤에는 조각이 이 이미지로 나뉘므로 고정).
+   * 업로드 이미지는 한 방에서만 쓴다: 다른 방이 이미 쓰는 업로드 이미지는 409.
+   * 기본 이미지는 여러 방이 함께 쓴다.
+   */
+  async setImage(
+    sessionId: number,
+    imageId: number,
+    me: RequestParticipant,
+  ): Promise<ImageDto> {
+    if (!me.isCreator) {
+      throw new BusinessException(SessionErrors.NOT_CREATOR);
+    }
+    return this.dataSource.transaction(async (manager) => {
+      const session = await manager.findOne(Session, {
+        where: { id: sessionId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!session) {
+        throw new BusinessException(SessionErrors.SESSION_NOT_FOUND);
+      }
+      if (session.status !== 'WAITING') {
+        throw new BusinessException(SessionErrors.IMAGE_LOCKED_AFTER_START);
+      }
+      const image = await manager.findOne(Image, { where: { id: imageId } });
+      if (!image) throw new BusinessException(ImageErrors.IMAGE_NOT_FOUND);
+
+      if (image.source === 'UPLOAD') {
+        const usedElsewhere = await manager.exists(Session, {
+          where: { imageId, id: Not(sessionId) },
+        });
+        if (usedElsewhere) {
+          throw new BusinessException(ImageErrors.IMAGE_IN_USE);
+        }
+      }
+
+      await manager.update(Session, { id: sessionId }, { imageId });
+      return this.images.toDto(image);
+    });
   }
 
   /**
