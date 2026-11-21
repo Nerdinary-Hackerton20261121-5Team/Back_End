@@ -54,9 +54,11 @@ export class AssemblyService {
       }),
       manager.find(Participant, { where: { sessionId } }),
     ]);
-    const layout = buildPuzzleLayout(sources.length);
     const boardRows = (session.gridRows ?? 0) * 2;
-    const slotOf = this.slotGeometry(layout.pieces, boardRows);
+    // 시작 API가 조립 조각을 더 만들지 않으므로 조각이 없는 판이면 칸도 비운다
+    const slotOf = pieces.length
+      ? this.slotGeometry(buildPuzzleLayout(sources.length).pieces, boardRows)
+      : new Map<number, AssemblySlotDto>();
     const ownerOf = new Map(sources.map((s) => [s.id, s.participantId]));
     const finalOf = new Map(
       participants.map((p) => [p.id, p.finalRestoration ?? 0]),

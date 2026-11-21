@@ -38,20 +38,31 @@ export class HeartbeatResponseDto {
 export class BoardPieceDto {
   @ApiProperty({
     description:
-      '원조각 위치 번호. 왼쪽 위부터 1, 한 행에 2칸 (gridRows × gridCols 격자)',
+      '정답 칸 번호. 왼쪽 위부터 1 (gridRows × gridCols 격자). 결과 화면에서 조각을 놓는 자리',
     example: 1,
   })
   position: number;
 
   @ApiProperty({
     description:
-      '격자에서 차지하는 칸 수. 5명일 때 마지막(5번) 원조각만 2(맨 아래 행 전체), 나머지는 1',
-    enum: [1, 2],
+      '공부 중 화면에 놓이는 칸 번호. 조각끼리 겹치지 않고, 주인의 정답 칸(자기·짝 조각 칸)과도 다르다. 시작 전 조각은 null',
+    nullable: true,
+    type: Number,
+    example: 5,
+  })
+  displaySlot: number | null;
+
+  @ApiProperty({
+    description: '격자에서 차지하는 칸 수. 지금은 항상 1 (호환용)',
+    enum: [1],
     example: 1,
   })
   colSpan: number;
 
-  @ApiProperty({ description: '내 원조각인지', example: true })
+  @ApiProperty({
+    description: '내 조각인지. 참가자 1명당 2개라 true인 조각이 2개다',
+    example: true,
+  })
   isMine: boolean;
 
   @ApiProperty({
@@ -77,10 +88,10 @@ export class BoardResponseDto {
   @ApiProperty({ example: 45 })
   remainingSeconds: number;
 
-  @ApiProperty({ description: '원조각 격자 행 수', example: 2 })
+  @ApiProperty({ description: '조각 격자 행 수 = 인원', example: 4 })
   gridRows: number;
 
-  @ApiProperty({ description: '원조각 격자 열 수', example: 2 })
+  @ApiProperty({ description: '조각 격자 열 수 (항상 2)', example: 2 })
   gridCols: number;
 
   @ApiProperty({
@@ -91,7 +102,7 @@ export class BoardResponseDto {
 
   @ApiProperty({
     type: [BoardPieceDto],
-    description: '원조각 목록 (시작 전이면 빈 배열)',
+    description: '조각 목록, 정답 칸 순서 (시작 전이면 빈 배열)',
   })
   pieces: BoardPieceDto[];
 

@@ -4,7 +4,7 @@ import {
   type SessionStatus,
 } from '../entities/session.entity.js';
 
-/** 세션 시작 응답. 조립 조각의 정답 위치는 조립 단계 전까지 내려주지 않는다. */
+/** 세션 시작 응답. 조각 배치는 진행판(GET /board)으로 받는다. */
 export class StartSessionResponseDto {
   @ApiProperty({ example: 1 })
   sessionId: number;
@@ -33,16 +33,29 @@ export class StartSessionResponseDto {
   @ApiProperty({ description: '시작 시점에 고정된 명단 인원', example: 4 })
   participantCount: number;
 
-  @ApiProperty({ description: '원조각 격자 행 수 (한 행에 2명)', example: 2 })
+  @ApiProperty({
+    description: '조각 격자 행 수 = 인원 (한 행 = 참가자 1명의 조각 2개)',
+    example: 4,
+  })
   gridRows: number;
 
-  @ApiProperty({ description: '원조각 격자 열 수', example: 2 })
+  @ApiProperty({ description: '조각 격자 열 수 (항상 2)', example: 2 })
   gridCols: number;
 
-  @ApiProperty({ description: '원조각 하나의 조립 조각 수 (1/4)', example: 4 })
+  @ApiProperty({ description: '조각 총수 = 인원 × 2', example: 8 })
+  pieceCount: number;
+
+  @ApiProperty({
+    description:
+      '세션 생성 때 저장한 분할 수. 조립 단계를 쓰지 않아 지금은 참고용',
+    example: 4,
+  })
   splitCount: number;
 
-  @ApiProperty({ description: '조립 조각 총수 = 인원 × 분할 수', example: 16 })
+  @ApiProperty({
+    description: '조립 조각 수. 조립 조각을 만들지 않아 항상 0 (호환용)',
+    example: 0,
+  })
   assemblyPieceCount: number;
 
   @ApiProperty({

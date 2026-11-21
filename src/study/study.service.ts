@@ -5,7 +5,6 @@ import type { RequestParticipant } from '../common/decorators/current-participan
 import { BusinessException } from '../common/exception/business.exception.js';
 import { heartbeatPolicy } from '../config/policy.js';
 import { SourcePiece } from '../puzzle/entities/source-piece.entity.js';
-import { buildPuzzleLayout } from '../puzzle/puzzle-splitter.js';
 import { Participant } from '../sessions/entities/participant.entity.js';
 import {
   Session,
@@ -122,14 +121,6 @@ export class StudyService {
       disconnectedAtById.set(p.id, disconnectedAt);
     }
 
-    const colSpans = new Map<number, number>(
-      sources.length
-        ? buildPuzzleLayout(sources.length).sources.map((s) => [
-            s.position,
-            s.colSpan,
-          ])
-        : [],
-    );
     const revealAll = status === 'ASSEMBLING' || status === 'COMPLETED';
 
     const pieces = sources
@@ -138,7 +129,9 @@ export class StudyService {
         const isMine = source.participantId === me.participantId;
         return {
           position: source.position,
-          colSpan: colSpans.get(source.position) ?? 1,
+          displaySlot: source.displaySlot,
+          // 조각 격자는 모든 칸이 한 칸 크기다 (참가자당 한 행)
+          colSpan: 1,
           isMine,
           // 집중 중 남의 조각은 블러로 보이도록 값을 내려주지 않는다 (실제 값은 서버가 계산 가능)
           restoration:
