@@ -67,12 +67,12 @@ export class SessionsController {
     summary: '대기실 나가기 (시작 전)',
     description:
       '시작 전 방에서 나간다. 내 참가자 정보를 지우므로 이 토큰은 이후 401로 거절되고, 빈자리에 다른 사람이 들어올 수 있다. ' +
-      '시작된 방은 명단이 고정돼 나갈 수 없다(409). 개설자는 나갈 수 없고 방 삭제를 쓴다(403).',
+      '방장이 나가면 입장 순서상 다음 사람이 방장이 된다(newCreatorId). 마지막 한 명이 나가면 방이 지워진다(sessionDeleted). ' +
+      '시작된 방은 명단이 고정돼 나갈 수 없다(409).',
   })
   @ApiSuccessResponse(LeaveSessionResponseDto)
   @ApiErrorResponses(
     CommonErrors.INVALID_INPUT,
-    SessionErrors.CREATOR_CANNOT_LEAVE,
     SessionErrors.SESSION_NOT_FOUND,
     SessionErrors.CANNOT_LEAVE_AFTER_START,
   )

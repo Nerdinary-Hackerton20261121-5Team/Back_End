@@ -32,10 +32,4 @@ export const SessionErrors = {
     status: HttpStatus.CONFLICT,
     message: '시작된 세션에서는 나갈 수 없습니다.',
   },
-  CREATOR_CANNOT_LEAVE: {
-    code: 'CREATOR_CANNOT_LEAVE',
-    status: HttpStatus.FORBIDDEN,
-    message:
-      '개설자는 나갈 수 없습니다. 방을 닫으려면 방 삭제를 사용해 주세요.',
-  },
 } as const satisfies Record<string, ErrorDefinition>;
