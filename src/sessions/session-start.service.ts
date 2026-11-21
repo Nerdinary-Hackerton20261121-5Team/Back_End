@@ -1,32 +1,25 @@
-import { randomInt } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { AssemblyPiece } from '../assembly/entities/assembly-piece.entity.js';
 import type { RequestParticipant } from '../common/decorators/current-participant.decorator.js';
 import { BusinessException } from '../common/exception/business.exception.js';
 import { MIN_START_PARTICIPANTS } from '../config/policy.js';
-import { SourcePiece } from '../puzzle/entities/source-piece.entity.js';
-import { buildPuzzleLayout } from '../puzzle/puzzle-splitter.js';
+import {
+  PIECES_PER_PARTICIPANT,
+  SourcePiece,
+} from '../puzzle/entities/source-piece.entity.js';
+import { buildPieceLayout, type PieceGrid } from '../puzzle/piece-layout.js';
 import { endsAt } from '../study/session-clock.js';
 import type { StartSessionResponseDto } from './dto/start-session-response.dto.js';
 import { Participant } from './entities/participant.entity.js';
 import { Session } from './entities/session.entity.js';
 import { SessionErrors } from './sessions.errors.js';
 
-/** Fisher–Yates 섞기 (원본은 그대로 둔다) */
-function shuffled<T>(items: readonly T[]): T[] {
-  const result = [...items];
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = randomInt(i + 1);
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
-}
-
 /**
  * 세션 시작 (F-002, F-003, F-008).
- * 세션 행을 잠근 채로 명단 고정 → 시작·종료 시각 확정 → 원조각·조립 조각 생성을 한 트랜잭션에서 한다.
+ * 세션 행을 잠근 채로 명단 고정 → 시작·종료 시각 확정 → 조각 생성을 한 트랜잭션에서 한다.
+ * 조각은 참가자당 2개이고, 공부 중 배치 칸(display_slot)을 서로 겹치지 않게 랜덤으로 정한다.
+ * 조립 조각(assembly_piece)은 만들지 않는다.
  * 입장(join)도 같은 행을 잠그므로, 시작과 입장이 동시에 와도 시작 시점 명단이 기준이 된다 (AC-005).
  */
 @Injectable()
@@ -52,13 +45,13 @@ export class SessionStartService {
 
       // AC-010 중복 시작: 처음 시작한 기준을 그대로 돌려준다
       if (session.status !== 'WAITING' && session.startedAt && session.endsAt) {
-        const count = await manager.count(SourcePiece, {
+        const pieceCount = await manager.count(SourcePiece, {
           where: { sessionId },
         });
-        return this.response(session, count, true);
+        return this.response(session, pieceCount, true);
       }
 
-      // 명단 고정: 시작 시점에 입장해 있는 참가자, 입장 순서대로 원조각을 배정한다
+      // 명단 고정: 시작 시점에 입장해 있는 참가자, 입장 순서대로 격자의 행을 배정한다
       const roster = await manager.find(Participant, {
         where: { sessionId },
         order: { joinedAt: 'ASC', id: 'ASC' },
@@ -71,7 +64,7 @@ export class SessionStartService {
       const startedAt = new Date();
       const finishAt = endsAt({ startedAt, goalSeconds: session.goalSeconds });
       if (!finishAt) throw new Error('종료 시각을 계산하지 못했습니다.');
-      const layout = buildPuzzleLayout(roster.length);
+      const layout = buildPieceLayout(roster.length);
 
       const changes = {
         status: 'FOCUSING' as const,
@@ -90,7 +83,7 @@ export class SessionStartService {
       await this.createPieces(manager, sessionId, roster, layout);
 
       Object.assign(session, changes);
-      return this.response(session, roster.length, false);
+      return this.response(session, layout.pieces.length, false);
     });
   }
 
@@ -98,28 +91,15 @@ export class SessionStartService {
     manager: EntityManager,
     sessionId: number,
     roster: Pick<Participant, 'id'>[],
-    layout: ReturnType<typeof buildPuzzleLayout>,
+    layout: PieceGrid,
   ): Promise<void> {
-    const sources = await manager.save(
-      layout.sources.map((source, i) =>
-        manager.create(SourcePiece, {
-          sessionId,
-          participantId: roster[i].id,
-          position: source.position,
-        }),
-      ),
-    );
-    const sourceIdByPosition = new Map(sources.map((s) => [s.position, s.id]));
-
-    // 조각 ID 순서로 정답 위치를 짐작하지 못하도록 저장 순서를 섞는다
     await manager.insert(
-      AssemblyPiece,
-      shuffled(layout.pieces).map((piece) => ({
+      SourcePiece,
+      layout.pieces.map((piece) => ({
         sessionId,
-        sourcePieceId: sourceIdByPosition.get(piece.sourcePosition)!,
+        participantId: roster[piece.ownerIndex].id,
         position: piece.position,
-        placedAt: null,
-        autoPlaced: false,
+        displaySlot: piece.displaySlot,
       })),
     );
   }
@@ -136,7 +116,7 @@ export class SessionStartService {
       | 'gridRows'
       | 'gridCols'
     >,
-    participantCount: number,
+    pieceCount: number,
     alreadyStarted: boolean,
   ): StartSessionResponseDto {
     return {
@@ -145,11 +125,12 @@ export class SessionStartService {
       startedAt: session.startedAt!,
       endsAt: session.endsAt!,
       goalSeconds: session.goalSeconds,
-      participantCount,
+      participantCount: pieceCount / PIECES_PER_PARTICIPANT,
       gridRows: session.gridRows ?? 0,
       gridCols: session.gridCols ?? 0,
       splitCount: session.splitCount,
-      assemblyPieceCount: participantCount * session.splitCount,
+      pieceCount,
+      assemblyPieceCount: 0,
       alreadyStarted,
       serverNow: new Date(),
     };

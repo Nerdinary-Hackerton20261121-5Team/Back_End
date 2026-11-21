@@ -5,12 +5,12 @@ import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module.js';
-import { AssemblyPiece } from '../src/assembly/entities/assembly-piece.entity.js';
 import { SourcePiece } from '../src/puzzle/entities/source-piece.entity.js';
 import { Participant } from '../src/sessions/entities/participant.entity.js';
 import { Session } from '../src/sessions/entities/session.entity.js';
 
 // 실제 DB(.env의 DB_*, dev 테스트용 app_dev)에 붙여 조립 API를 확인한다.
+// 시작 API가 조립 조각(assembly_piece)을 만들지 않으므로, 집중이 끝나면 조립판은 비어 있고 바로 팀 통과가 된다.
 // 집중 시간이 끝난 상황은 DB의 시각을 과거로 옮겨 만든다. 만든 세션은 끝나면 지운다.
 describe('조립·종료 API (e2e)', () => {
   let app: INestApplication<App>;
@@ -99,16 +99,6 @@ describe('조립·종료 API (e2e)', () => {
     }
   }
 
-  /** 참가자의 조립 조각과 정답 위치 (테스트에서만 DB로 확인) */
-  async function piecesOf(sessionId: number, member: Member) {
-    const source = await dataSource
-      .getRepository(SourcePiece)
-      .findOneByOrFail({ sessionId, participantId: member.participantId });
-    return dataSource
-      .getRepository(AssemblyPiece)
-      .find({ where: { sourcePieceId: source.id } });
-  }
-
   const board = (sessionId: number, token: string) =>
     http()
       .get(`/api/sessions/${sessionId}/assembly`)
@@ -130,34 +120,22 @@ describe('조립·종료 API (e2e)', () => {
     expect(res.body.code).toBe('ASSEMBLY_NOT_OPEN');
   });
 
-  it('조립 열기: ASSEMBLING, 4×4 판, 부재자 조각 자동 배치, 정답 위치는 숨김', async () => {
+  it('집중이 끝나면 조립 조각이 없으므로 바로 팀 통과(COMPLETED), 최종 복원도는 확정', async () => {
     const { sessionId, members } = await startedRoom(4);
     const away = members[3];
     await finishFocus(sessionId, members, [away]);
 
     const res = await board(sessionId, members[0].participantToken).expect(200);
-    const data = res.body.data;
-    expect(data).toMatchObject({
-      status: 'ASSEMBLING',
-      boardRows: 4,
+    expect(res.body.data).toMatchObject({
+      status: 'COMPLETED',
+      boardRows: 8,
       boardCols: 4,
-      totalPieces: 16,
-      placedCount: 4, // 부재자 1명의 조각 4개
-      completed: false,
+      totalPieces: 0,
+      placedCount: 0,
+      completed: true,
+      slots: [],
+      pieces: [],
     });
-    expect(data.slots).toHaveLength(16);
-
-    const auto = data.pieces.filter(
-      (p: { autoPlaced: boolean }) => p.autoPlaced,
-    );
-    expect(auto).toHaveLength(4);
-    const waiting = data.pieces.filter((p: { placed: boolean }) => !p.placed);
-    expect(
-      waiting.every((p: { position: unknown }) => p.position === null),
-    ).toBe(true);
-    expect(
-      data.pieces.filter((p: { isMine: boolean }) => p.isMine),
-    ).toHaveLength(4);
 
     // 최종 복원도: 끝까지 있던 사람 1, 부재자 0
     const final = await dataSource
@@ -170,119 +148,47 @@ describe('조립·종료 API (e2e)', () => {
       final.find((p) => p.id === members[0].participantId)?.finalRestoration,
     ).toBe(1);
 
-    // AC-054 다시 조회해도 중복 처리 없음
+    const session = await dataSource
+      .getRepository(Session)
+      .findOneByOrFail({ id: sessionId });
+    expect(session.completedAt).not.toBeNull();
+    // 조각(source_piece)은 결과 화면용으로 그대로 남는다
+    expect(
+      await dataSource
+        .getRepository(SourcePiece)
+        .count({ where: { sessionId } }),
+    ).toBe(8);
+
+    // AC-054 다시 조회해도 같은 결과
     const again = await board(sessionId, members[1].participantToken).expect(
       200,
     );
-    expect(again.body.data.placedCount).toBe(4);
-  });
-
-  it('조각 놓기: 틀린 칸은 저장 안 함, 남의 조각 403, 정답 칸 저장, 모두 놓으면 팀 통과', async () => {
-    const { sessionId, members } = await startedRoom(4);
-    await finishFocus(sessionId, members);
-    await board(sessionId, members[0].participantToken).expect(200);
-
-    const [first, ...rest] = await piecesOf(sessionId, members[0]);
-    const wrongTarget = first.position === 1 ? 2 : 1;
-
-    const wrong = await place(
-      sessionId,
-      first.id,
-      wrongTarget,
-      members[0].participantToken,
-    ).expect(200);
-    expect(wrong.body.data).toMatchObject({
-      correct: false,
-      placed: false,
-      placedCount: 0,
-    });
-    expect(['WRONG_POSITION', 'OCCUPIED']).toContain(wrong.body.data.reason);
-
-    const notMine = await place(
-      sessionId,
-      first.id,
-      first.position,
-      members[1].participantToken,
-    ).expect(403);
-    expect(notMine.body.code).toBe('NOT_PIECE_OWNER');
-
-    const ok = await place(
-      sessionId,
-      first.id,
-      first.position,
-      members[0].participantToken,
-    ).expect(200);
-    expect(ok.body.data).toMatchObject({
-      correct: true,
-      placed: true,
-      placedCount: 1,
-      completed: false,
-    });
-
-    // 같은 요청 재전송은 그대로
-    const again = await place(
-      sessionId,
-      first.id,
-      first.position,
-      members[0].participantToken,
-    ).expect(200);
-    expect(again.body.data).toMatchObject({ correct: true, placedCount: 1 });
-
-    // 나머지 조각을 모두 정답 칸에 놓으면 팀 통과
-    let last: { completed: boolean; placedCount: number } | undefined;
-    for (const p of rest) {
-      last = (
-        await place(sessionId, p.id, p.position, members[0].participantToken)
-      ).body.data;
-    }
-    for (const m of members.slice(1)) {
-      for (const p of await piecesOf(sessionId, m)) {
-        last = (await place(sessionId, p.id, p.position, m.participantToken))
-          .body.data;
-      }
-    }
-    expect(last).toMatchObject({ completed: true, placedCount: 16 });
-
-    const done = await board(sessionId, members[0].participantToken).expect(
-      200,
-    );
-    expect(done.body.data).toMatchObject({
+    expect(again.body.data).toMatchObject({
       status: 'COMPLETED',
-      completed: true,
+      totalPieces: 0,
     });
   });
 
-  it('5명이면 조립판 6행 4열, 맨 아래 두 행의 칸은 두 열짜리', async () => {
-    const { sessionId, members } = await startedRoom(5);
-    await finishFocus(sessionId, members);
-    const res = await board(sessionId, members[0].participantToken).expect(200);
-    expect(res.body.data).toMatchObject({ boardRows: 6, boardCols: 4 });
-    const wide = res.body.data.slots.filter(
-      (s: { colSpan: number }) => s.colSpan === 2,
-    );
-    expect(wide.map((s: { row: number }) => s.row).sort()).toEqual([
-      4, 4, 5, 5,
-    ]);
-  });
-
-  it('400: 범위 밖 칸, 숫자 아닌 값 / 404: 없는 조각', async () => {
+  it('400: 숫자 아닌 값·0 / 404: 조립 조각이 없으므로 어떤 조각 ID든 없음', async () => {
     const { sessionId, members } = await startedRoom(4);
     await finishFocus(sessionId, members);
-    const [mine] = await piecesOf(sessionId, members[0]);
     const token = members[0].participantToken;
+    const [source] = await dataSource
+      .getRepository(SourcePiece)
+      .find({ where: { sessionId }, take: 1 });
 
     expect(
-      (await place(sessionId, mine.id, 99, token).expect(400)).body.code,
+      (await place(sessionId, source.id, 0, token).expect(400)).body.code,
     ).toBe('INVALID_INPUT');
     expect(
-      (await place(sessionId, mine.id, 0, token).expect(400)).body.code,
-    ).toBe('INVALID_INPUT');
-    expect(
-      (await place(sessionId, mine.id, 'abc', token).expect(400)).body.code,
+      (await place(sessionId, source.id, 'abc', token).expect(400)).body.code,
     ).toBe('INVALID_INPUT');
     expect(
       (await place(sessionId, 'abc', 1, token).expect(400)).body.code,
     ).toBe('INVALID_INPUT');
+    expect(
+      (await place(sessionId, source.id, 1, token).expect(404)).body.code,
+    ).toBe('PIECE_NOT_FOUND');
     expect(
       (await place(sessionId, 999999999, 1, token).expect(404)).body.code,
     ).toBe('PIECE_NOT_FOUND');
@@ -310,7 +216,7 @@ describe('조립·종료 API (e2e)', () => {
     ).toBe(0);
     expect(
       await dataSource
-        .getRepository(AssemblyPiece)
+        .getRepository(SourcePiece)
         .count({ where: { sessionId } }),
     ).toBe(0);
     await http()
