@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { createObserveModule } from '@nestjs/observe';
+import { AssemblyModule } from './assembly/assembly.module.js';
 import { CommonModule } from './common/common.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -27,6 +28,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     SessionsModule,
     StorageModule,
     StudyModule,
+    AssemblyModule,
   ],
 })
 export class AppModule {}

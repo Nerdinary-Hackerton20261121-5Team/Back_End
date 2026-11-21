@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
@@ -12,6 +13,16 @@ import type { StartSessionResponseDto } from './dto/start-session-response.dto.j
 import { Participant } from './entities/participant.entity.js';
 import { Session } from './entities/session.entity.js';
 import { SessionErrors } from './sessions.errors.js';
+
+/** Fisher–Yates 섞기 (원본은 그대로 둔다) */
+function shuffled<T>(items: readonly T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
 
 /**
  * 세션 시작 (F-002, F-003, F-008).
@@ -100,9 +111,10 @@ export class SessionStartService {
     );
     const sourceIdByPosition = new Map(sources.map((s) => [s.position, s.id]));
 
+    // 조각 ID 순서로 정답 위치를 짐작하지 못하도록 저장 순서를 섞는다
     await manager.insert(
       AssemblyPiece,
-      layout.pieces.map((piece) => ({
+      shuffled(layout.pieces).map((piece) => ({
         sessionId,
         sourcePieceId: sourceIdByPosition.get(piece.sourcePosition)!,
         position: piece.position,
