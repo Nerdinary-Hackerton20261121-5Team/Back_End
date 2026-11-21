@@ -1,10 +1,12 @@
-# 배포 워크플로 초안: main에 push(병합)되면 이미지를 만들어 EC2에 배포한다.
-# AWS 리소스와 GitHub Secrets가 준비되기 전에는 check 단계에서 배포를 건너뛴다.
+# GitOps 자동 배포: main에 push(병합)되면 이미지를 만들어 ghcr에 올리고,
+# cluster-config 레포의 이미지 태그를 갱신한다. 이후 Argo CD가 그 커밋을 감지해 클러스터에 반영한다.
 #
-# 필요한 GitHub Secrets
-#   EC2_HOST, EC2_USER, EC2_SSH_KEY            EC2 접속
-#   DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD, DB_DATABASE   RDS 접속
-#   CORS_ORIGIN                                허용할 프론트 주소
+#   main push → docker build (linux/amd64) → ghcr.io/<owner>/<repo>:<sha> push
+#            → cluster-config deploy-image 호출 (app=be) → 커밋 "deploy(be): <image>"
+#            → Argo CD 롤링 업데이트
+#
+# 필요한 것: 레포 secret CLUSTER_CONFIG_DEPLOY_KEY (secrets: inherit 로 전달, 이미 등록됨)
+# 롤백: cluster-config 레포에서 해당 deploy(be) 커밋을 revert (README 참고)
 name: Deploy
 
 on:
@@ -13,40 +15,26 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy
+  group: deploy-${{ github.ref }}
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  packages: write
-
 jobs:
-  check:
+  build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
     outputs:
-      enabled: ${{ steps.check.outputs.enabled }}
-    steps:
-      - id: check
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-        run: |
-          if [ -n "$EC2_HOST" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::EC2_HOST Secret이 없어 배포를 건너뜁니다."
-          fi
-
-  deploy:
-    needs: check
-    if: needs.check.outputs.enabled == 'true'
-    runs-on: ubuntu-latest
+      image: ${{ steps.meta.outputs.image }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Image name
-        id: image
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+        id: meta
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
         with:
@@ -57,54 +45,20 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/amd64 # 홈서버 k3s가 amd64
           push: true
-          tags: |
-            ${{ steps.image.outputs.name }}:latest
-            ${{ steps.image.outputs.name }}:${{ github.sha }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          tags: ${{ steps.meta.outputs.image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1
-        env:
-          IMAGE: ${{ steps.image.outputs.name }}:${{ github.sha }}
-          GHCR_USER: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_USERNAME: ${{ secrets.DB_USERNAME }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_DATABASE: ${{ secrets.DB_DATABASE }}
-          CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          envs: IMAGE,GHCR_USER,GHCR_TOKEN,DB_HOST,DB_PORT,DB_USERNAME,DB_PASSWORD,DB_DATABASE,CORS_ORIGIN
-          script: |
-            set -e
-            # 운영 환경변수 파일 (EC2에만 존재, 권한 600)
-            umask 077
-            cat > ~/app.env <<ENV
-            PORT=3000
-            DB_HOST=$DB_HOST
-            DB_PORT=$DB_PORT
-            DB_USERNAME=$DB_USERNAME
-            DB_PASSWORD=$DB_PASSWORD
-            DB_DATABASE=$DB_DATABASE
-            DB_LOGGING=false
-            CORS_ORIGIN=$CORS_ORIGIN
-            ENV
-
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            docker pull "$IMAGE"
-
-            # 마이그레이션 적용 (data-source가 있는 경우에만)
-            docker run --rm --env-file ~/app.env "$IMAGE" sh -c \
-              'if [ -f dist/database/data-source.js ]; then node ./node_modules/typeorm/cli.js migration:run -d dist/database/data-source.js; else echo "no data-source, skip migration"; fi'
-
-            # 앱 교체. 3000은 EC2 내부(127.0.0.1)에만 열고, 외부는 Nginx(80/443)가 받는다.
-            docker rm -f app 2>/dev/null || true
-            docker run -d --name app --restart unless-stopped \
-              --env-file ~/app.env -p 127.0.0.1:3000:3000 "$IMAGE"
-
-            docker image prune -f
-            docker logout ghcr.io
+  deploy:
+    needs: build
+    permissions:
+      contents: read
+    uses: Nerdinary-Hackerton20261121-5Team/cluster-config/.github/workflows/deploy-image.yml@main
+    with:
+      app: be
+      image: ${{ needs.build.outputs.image }}
+    secrets: inherit
