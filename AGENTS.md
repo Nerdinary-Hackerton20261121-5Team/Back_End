@@ -122,7 +122,8 @@ NestJS 버전·ESM 규칙·테스트(Vitest)·Observe 관련 안내는 [NestJS �
 
 - 이 저장소는 공개다. 비밀번호·토큰·API 키·Observe 키(`OBSERVE_APP_KEY`·`OBSERVE_APP_SECRET`)·`.env` 내용을 코드·문서·이슈·PR·커밋 메시지·스크린샷 어디에도 올리지 않는다.
   `.env`는 `.gitignore`에 있으며 로컬에서만 쓴다. 실수로 올렸다면 지우는 것으로 끝나지 않으니(이력에 남는다) 바로 운영자에게 알려 교체한다.
-- 운영·dev 환경변수는 클러스터가 주입한다. 이 레포에는 **이름만** 적는다: `PORT`, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `DB_LOGGING`, `CORS_ORIGIN`, `GIT_SHA`.
+- 운영·dev 환경변수는 클러스터가 주입한다. 이 레포에는 **이름만** 적는다: `PORT`, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `DB_LOGGING`, `CORS_ORIGIN`, `GIT_SHA`,
+  `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_FORCE_PATH_STYLE`, `IMGPROXY_URL`(be-env·be-dev-env), `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `IMGPROXY_KEY`, `IMGPROXY_SALT`(운영자 Secret `storage-auth`).
   값 중 `DB_PASSWORD`는 운영자가 클러스터 Secret으로 관리한다. 변수를 더해야 하면 cluster-config의 `apps/be/secret.yaml`(운영)·`apps/be-dev/secret.yaml`(dev) 변경이 필요하니 운영자와 맞춘다.
 - DB 비밀번호는 운영자에게 직접 받고 개인 `.env`에만 둔다. 운영 DB(`app`)·dev DB(`app_dev`)는 백업이 없으니 `DROP`·대량 `DELETE` 전에 한 번 더 확인한다.
 
