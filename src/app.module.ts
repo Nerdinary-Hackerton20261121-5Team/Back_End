@@ -9,6 +9,7 @@ import { HealthModule } from './health/health.module.js';
 import { SessionsModule } from './sessions/sessions.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { StudyModule } from './study/study.module.js';
+import { ThrottleModule } from './throttle/throttle.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -16,6 +17,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     CommonModule,
+    ThrottleModule,
     DatabaseModule,
     // Distributed tracing, auto-correlated logs, request/job metrics, error
     // telemetry, alarms, and more — out of the box. Sign up at https://observe.nestjs.com,
