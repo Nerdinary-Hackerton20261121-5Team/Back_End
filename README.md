@@ -125,7 +125,7 @@ Dockerfile           # 운영 이미지 (포트 3000)
 
 Back_End · Frontend · cluster-config 세 레포 README가 같은 표를 쓴다.
 
-인프라 전체 구성: https://github.com/Nerdinary-Hackerton20261121-5Team/cluster-config/blob/main/docs/INFRA.md
+인프라 전체 구성은 아래 [인프라 구성도](#인프라-구성도)에 있다. 매니페스트는 운영자가 관리하는 비공개 저장소 `cluster-config` 에 있다.
 
 | 항목 | 내용 |
 |---|---|
@@ -142,6 +142,48 @@ Back_End · Frontend · cluster-config 세 레포 README가 같은 표를 쓴다
 ### DB 외부 접속
 
 DB 포트는 인터넷에 열려 있지 않다. 클러스터 밖에서는 운영자가 Tailscale 노드를 공유한 사람만, Tailscale 앱을 켠 상태(tailnet 안)에서 접속할 수 있다. 인터넷 공개 경로(cloudflared)는 2026-11-22 에 없앴다. 운영 DB는 사용자 `app` · 데이터베이스 `app`, dev DB는 사용자 `app_dev` · 데이터베이스 `app_dev`이고 접속 주소와 비밀번호는 운영자에게 받는다. 비밀번호는 `.env` 같은 로컬 파일에만 두고 레포·이슈·PR·공개 채팅에 쓰지 않는다. 백업이 없으니 `DROP`·대량 `DELETE` 전에 한 번 더 확인한다.
+
+## 인프라 구성도
+
+운영과 dev 가 같은 클러스터의 서로 다른 앱으로 떠 있다. 외부에서 들어오는 길은 Cloudflare Tunnel 하나이고, 서버에 열린 인바운드 포트는 없다.
+
+```mermaid
+flowchart LR
+  user((사용자 · APK)) -->|HTTPS| cf[Cloudflare<br/>TLS · Tunnel]
+  cf --> gw[gateway<br/>nginx]
+
+  subgraph k3s["k3s 클러스터 · namespace cmc-11th"]
+    gw -->|"운영 /api · /docs"| be[be<br/>NestJS :3000]
+    gw -->|"운영 그 밖"| fe[fe<br/>nginx 정적 :80]
+    gw -->|"dev /api · /docs"| bedev[be-dev :3000]
+    gw -->|"dev 그 밖"| fedev[fe-dev :80]
+    gw -->|"/img"| img[imgproxy<br/>이미지 리사이즈]
+    be --> db[(MySQL 8.4<br/>DB app)]
+    bedev --> db2[(같은 MySQL<br/>DB app_dev)]
+    be -->|업로드| s3[(S3 호환 저장소<br/>버킷 images)]
+    bedev -->|업로드| s3dev[(버킷 images-dev)]
+    img --> s3
+    img --> s3dev
+  end
+
+  subgraph cicd["CI/CD"]
+    gh[GitHub Actions<br/>lint · build · test] -->|이미지 push| reg[(컨테이너 레지스트리)]
+    gh -->|이미지 태그 커밋| cc[cluster-config<br/>비공개 저장소]
+    cc -->|자동 sync| argo[Argo CD]
+  end
+  argo -->|롤링 업데이트| k3s
+  reg -.->|이미지 pull| k3s
+```
+
+| 구성 | 내용 |
+|---|---|
+| WAS 와 DB 분리 | `be`(NestJS)와 MySQL 은 서로 다른 파드다. DB 는 클러스터 안에서만 `mysql:3306` 으로 접근하고 Service 는 ClusterIP 다 |
+| 파일 업로드 | 원본은 S3 호환 저장소에 두고, 화면에는 imgproxy 가 줄인 이미지를 `/img/...` 로 내려준다. 운영과 dev 는 버킷이 다르다 |
+| HTTPS | Cloudflare 가 TLS 를 끝낸다. `http://` 요청은 301 로 `https://` 로 보낸다 |
+| 포트 | 외부 노출은 Cloudflare Tunnel 뿐이라 서버에 열린 인바운드 포트가 없다. DB 포트는 인터넷에 열려 있지 않다 |
+| 비밀값 | DB 비밀번호와 저장소 키는 클러스터 Secret 으로 주입한다. 코드와 이 저장소에는 값이 없다(`.env.example` 은 이름만) |
+| CI/CD | `dev` 머지 → dev 서버, `main` 머지 → 운영. GitHub Actions 가 이미지를 올리고 태그를 커밋하면 Argo CD 가 반영한다(1~3분) |
+| 운영과 dev 분리 | 주소, 파드, DB, 버킷, 환경변수(`be-env` · `be-dev-env`)가 모두 따로다 |
 
 ## ERD
 
