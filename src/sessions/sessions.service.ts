@@ -62,6 +62,13 @@ export class SessionsService {
       );
     }
 
+    if (dto.imageKey && dto.imageId) {
+      throw new BusinessException(
+        CommonErrors.INVALID_INPUT,
+        'imageKey와 imageId 중 하나만 보내 주세요.',
+      );
+    }
+
     // AC-002 같은 생성 요청 재전송이면 방을 새로 만들지 않는다
     const existing = await this.sessions.findOne({
       where: { createRequestId: dto.clientRequestId },
@@ -306,8 +313,10 @@ export class SessionsService {
     manager: EntityManager,
     dto: CreateSessionDto,
   ): Promise<SessionEntryResponseDto> {
+    const imageId = await this.resolveImage(manager, dto);
     const session = await manager.save(
       manager.create(Session, {
+        imageId,
         sessionCode: generateInviteCode(),
         createRequestId: dto.clientRequestId,
         maxParticipants: dto.maxParticipants,
@@ -327,6 +336,30 @@ export class SessionsService {
       }),
     );
     return this.entry(session, creator, token, false);
+  }
+
+  /** 방 이미지: 업로드 key면 images 행을 만들고(같은 key면 재사용), 기본 이미지 ID면 있는지 확인한다 */
+  private async resolveImage(
+    manager: EntityManager,
+    dto: CreateSessionDto,
+  ): Promise<number | null> {
+    if (dto.imageId) {
+      const exists = await manager.existsBy(Image, { id: dto.imageId });
+      if (!exists) {
+        throw new BusinessException(
+          CommonErrors.INVALID_INPUT,
+          '이미지를 찾을 수 없습니다.',
+        );
+      }
+      return dto.imageId;
+    }
+    if (!dto.imageKey) return null;
+    const found = await manager.findOneBy(Image, { imageKey: dto.imageKey });
+    if (found) return found.id;
+    const created = await manager.save(
+      manager.create(Image, { source: 'UPLOAD', imageKey: dto.imageKey }),
+    );
+    return created.id;
   }
 
   private async restoreCreator(
