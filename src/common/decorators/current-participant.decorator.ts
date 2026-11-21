@@ -12,6 +12,8 @@ import {
 export interface RequestParticipant {
   participantId: number;
   sessionId: number;
+  /** 개설자만 할 수 있는 동작(이미지 지정, 시작 등) 확인용 */
+  isCreator: boolean;
 }
 
 export function participantFromContext(
