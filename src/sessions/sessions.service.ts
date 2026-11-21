@@ -187,6 +187,37 @@ export class SessionsService {
     return { sessionId, deleted: true };
   }
 
+  /**
+   * 시작 전 대기실 나가기 (F-002, F-011, AC-005).
+   * 세션 행을 잠가 입장·시작과 한 줄로 세운다. 참가자 행을 지우므로 토큰은 무효가 되고 자리가 빈다.
+   * TODO: 개설자가 나갈 때 처리(방 삭제 vs 방장 넘기기)는 팀 결정 전이라 막아 둔다 (#53).
+   */
+  async leave(
+    sessionId: number,
+    me: RequestParticipant,
+  ): Promise<{ sessionId: number; participantId: number; left: true }> {
+    if (me.isCreator) {
+      throw new BusinessException(SessionErrors.CREATOR_CANNOT_LEAVE);
+    }
+    return this.dataSource.transaction(async (manager) => {
+      const session = await manager.findOne(Session, {
+        where: { id: sessionId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!session) {
+        throw new BusinessException(SessionErrors.SESSION_NOT_FOUND);
+      }
+      if (session.status !== 'WAITING') {
+        throw new BusinessException(SessionErrors.CANNOT_LEAVE_AFTER_START);
+      }
+      await manager.delete(Participant, {
+        id: me.participantId,
+        sessionId,
+      });
+      return { sessionId, participantId: me.participantId, left: true };
+    });
+  }
+
   private async insertSession(
     manager: EntityManager,
     dto: CreateSessionDto,

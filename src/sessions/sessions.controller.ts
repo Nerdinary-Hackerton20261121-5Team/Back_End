@@ -27,6 +27,7 @@ import {
   SessionEntryResponseDto,
 } from './dto/session-response.dto.js';
 import { DeleteSessionResponseDto } from './dto/delete-session-response.dto.js';
+import { LeaveSessionResponseDto } from './dto/leave-session-response.dto.js';
 import { StartSessionResponseDto } from './dto/start-session-response.dto.js';
 import { SessionStartService } from './session-start.service.js';
 import { SessionErrors } from './sessions.errors.js';
@@ -58,6 +59,28 @@ export class SessionsController {
     @CurrentParticipant() me: RequestParticipant,
   ): Promise<DeleteSessionResponseDto> {
     return this.sessions.remove(sessionId, me);
+  }
+
+  @Delete(':sessionId/participants/me')
+  @ParticipantAuth()
+  @ApiOperation({
+    summary: '대기실 나가기 (시작 전)',
+    description:
+      '시작 전 방에서 나간다. 내 참가자 정보를 지우므로 이 토큰은 이후 401로 거절되고, 빈자리에 다른 사람이 들어올 수 있다. ' +
+      '시작된 방은 명단이 고정돼 나갈 수 없다(409). 개설자는 나갈 수 없고 방 삭제를 쓴다(403).',
+  })
+  @ApiSuccessResponse(LeaveSessionResponseDto)
+  @ApiErrorResponses(
+    CommonErrors.INVALID_INPUT,
+    SessionErrors.CREATOR_CANNOT_LEAVE,
+    SessionErrors.SESSION_NOT_FOUND,
+    SessionErrors.CANNOT_LEAVE_AFTER_START,
+  )
+  leave(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @CurrentParticipant() me: RequestParticipant,
+  ): Promise<LeaveSessionResponseDto> {
+    return this.sessions.leave(sessionId, me);
   }
 
   @Post(':sessionId/start')
