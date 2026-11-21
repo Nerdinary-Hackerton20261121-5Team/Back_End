@@ -7,6 +7,10 @@ import {
   Patch,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiPieceIdParam,
+  ApiSessionIdParam,
+} from '../common/swagger/api-params.decorators.js';
 import { ParticipantAuth } from '../auth/participant-auth.decorator.js';
 import {
   CurrentParticipant,
@@ -27,6 +31,7 @@ import {
 } from './dto/assembly.dto.js';
 
 @ApiTags('assembly')
+@ApiSessionIdParam()
 @Controller('sessions')
 export class AssemblyController {
   constructor(private readonly assembly: AssemblyService) {}
@@ -53,6 +58,7 @@ export class AssemblyController {
   }
 
   @Patch(':sessionId/assembly/pieces/:pieceId')
+  @ApiPieceIdParam()
   @ParticipantAuth()
   @ApiOperation({
     summary: '조각 놓기',
