@@ -46,3 +46,29 @@ export function heartbeatPolicy(): {
     ),
   };
 }
+
+/**
+ * 끝났거나 방치된 방 자동 정리 기준(분) (POL-010, SPEC `CLEANUP_AFTER`).
+ * TODO(Q-004): 팀 확정 전 임시값. 완성 후 결과를 볼 시간을 남기고, 시작하지 않은 방·완성하지 못한 방을 정리한다.
+ */
+export function cleanupPolicy(): {
+  enabled: boolean;
+  intervalMinutes: number;
+  completedRetentionMinutes: number;
+  waitingTtlMinutes: number;
+  unfinishedAfterEndMinutes: number;
+} {
+  return {
+    enabled: process.env.POLICY_CLEANUP_ENABLED !== 'false',
+    intervalMinutes: intFromEnv('POLICY_CLEANUP_INTERVAL_MINUTES', 10),
+    completedRetentionMinutes: intFromEnv(
+      'POLICY_CLEANUP_COMPLETED_MINUTES',
+      60,
+    ),
+    waitingTtlMinutes: intFromEnv('POLICY_CLEANUP_WAITING_MINUTES', 120),
+    unfinishedAfterEndMinutes: intFromEnv(
+      'POLICY_CLEANUP_UNFINISHED_MINUTES',
+      60,
+    ),
+  };
+}
