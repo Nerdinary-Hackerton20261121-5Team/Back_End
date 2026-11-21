@@ -29,7 +29,6 @@ import type {
 } from './dto/session-response.dto.js';
 import { Participant } from './entities/participant.entity.js';
 import { Session, type SessionStatus } from './entities/session.entity.js';
-import { Image } from '../storage/entities/image.entity.js';
 import type { LeaveSessionResponseDto } from './dto/leave-session-response.dto.js';
 import { generateInviteCode } from './invite-code.js';
 import { SessionErrors } from './sessions.errors.js';
