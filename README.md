@@ -13,7 +13,6 @@
 | API 문서 | Swagger (`@nestjs/swagger`) |
 | 요청 검증 | class-validator / class-transformer |
 | 설정 관리 | `@nestjs/config` (.env) |
-| 모니터링 | NestJS Observe (트레이스·로그·에러) |
 | 테스트 | Vitest, Supertest |
 | 코드 품질 | oxlint, Prettier |
 
@@ -104,7 +103,6 @@ Dockerfile           # 운영 이미지 (포트 3000)
 - **요청 검증**: 모든 요청 바디는 DTO로 검증하고, 정의되지 않은 필드가 들어오면 400 에러로 거부합니다.
 - **API 문서 자동화**: 코드에서 Swagger 문서를 자동 생성하며, JWT(Bearer) 인증을 지원합니다.
 - **기능별 모듈 분리**: 기능마다 독립된 모듈로 나눠 팀원 간 작업 충돌을 줄였습니다.
-- **모니터링**: 요청 추적, 로그, 에러를 NestJS Observe로 수집할 수 있도록 구성했습니다.
 
 ## 스크립트
 

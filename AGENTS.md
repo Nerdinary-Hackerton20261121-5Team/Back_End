@@ -89,7 +89,7 @@ mode가 template이면 보관본을 실제 프로젝트처럼 진행하지 않�
 
 ## 8. 이 저장소의 기술 지침 (백엔드)
 
-NestJS 버전·ESM 규칙·테스트(Vitest)·Observe 관련 안내는 [NestJS 기술 지침](docs/Coding/NESTJS.md)을 따른다.
+NestJS 버전·ESM 규칙·테스트(Vitest) 안내는 [NestJS 기술 지침](docs/Coding/NESTJS.md)을 따른다.
 코드 작업 전에 이 문서를 읽는다.
 
 ## 9. 협업·배포 규칙 (사람·AI 기여자 공통)
@@ -120,7 +120,7 @@ NestJS 버전·ESM 규칙·테스트(Vitest)·Observe 관련 안내는 [NestJS �
 
 ### 비밀값
 
-- 이 저장소는 공개다. 비밀번호·토큰·API 키·Observe 키(`OBSERVE_APP_KEY`·`OBSERVE_APP_SECRET`)·`.env` 내용을 코드·문서·이슈·PR·커밋 메시지·스크린샷 어디에도 올리지 않는다.
+- 이 저장소는 공개다. 비밀번호·토큰·API 키·`.env` 내용을 코드·문서·이슈·PR·커밋 메시지·스크린샷 어디에도 올리지 않는다.
   `.env`는 `.gitignore`에 있으며 로컬에서만 쓴다. 실수로 올렸다면 지우는 것으로 끝나지 않으니(이력에 남는다) 바로 운영자에게 알려 교체한다.
 - 운영·dev 환경변수는 클러스터가 주입한다. 이 레포에는 **이름만** 적는다: `PORT`, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `DB_LOGGING`, `CORS_ORIGIN`, `GIT_SHA`,
   `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_FORCE_PATH_STYLE`, `IMGPROXY_URL`(be-env·be-dev-env), `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `IMGPROXY_KEY`, `IMGPROXY_SALT`(운영자 Secret `storage-auth`).
