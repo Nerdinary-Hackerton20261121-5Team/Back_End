@@ -99,8 +99,9 @@ NestJS 버전·ESM 규칙·테스트(Vitest)·Observe 관련 안내는 [NestJS �
 
 ### 브랜치·PR
 
-- 작업은 `main`에서 딴 브랜치(`feat/작업명`, `fix/작업명`, `docs/작업명`, `chore/작업명`, `ci/작업명`)에서 하고 **base를 `main`으로 해서 PR**을 연다(GitHub 기본 브랜치가 `main`이다).
-  `main`은 보호 브랜치라 직접 push하지 않고(승인 1명 필요) force push·rebase로 공유 이력을 고치지 않는다.
+- 흐름은 **기능 브랜치 → PR(base `dev`) → `dev` → `dev`→`main` PR → `main`** 이다. 작업은 `dev`에서 딴 브랜치(`feat/작업명`, `fix/작업명`, `docs/작업명`, `chore/작업명`, `ci/작업명`)에서 하고 **base를 `dev`로 해서 PR**을 연다(GitHub 기본 브랜치가 `dev`다).
+  `dev`·`main`에는 직접 push하지 않고(`main`은 보호 브랜치라 승인 1명 필요) force push·rebase로 공유 이력을 고치지 않는다.
+- 운영 반영은 dev 서버에서 확인한 뒤 `dev`→`main` PR을 여는 것으로만 한다. 이 PR에는 `dev`에만 있는 커밋이 모두 실리니 머지 전에 커밋 목록·diff를 확인한다.
 - 커밋은 `종류: 내용` 형식(`feat`·`fix`·`docs`·`chore`·`ci`·`refactor`·`test`)으로 기능 단위로 나눈다.
   PR 본문은 `.github/PULL_REQUEST_TEMPLATE.md` 양식을 채우고 관련 이슈는 `closes #번호`로 잇는다.
 - 커밋·PR에 AI 공동작성자(Co-Authored-By)나 에이전트 도구 표기를 넣지 않는다.
@@ -109,30 +110,31 @@ NestJS 버전·ESM 규칙·테스트(Vitest)·Observe 관련 안내는 [NestJS �
 
 ### 배포
 
-- 배포는 **`main` 머지로만** 일어난다. `main`에 머지하면 곧바로 운영(https://cmc-11th.bemelon.me)에 반영되므로 CI가 초록인지 확인하고 머지한다.
-  머지 뒤에는 Actions `Deploy`가 초록인지, `/api/health`의 `commit`이 방금 머지한 커밋인지 본다.
+- 배포는 **`dev`·`main` 머지로만** 일어난다. `dev`에 머지하면 dev 서버(https://cmc-11th-dev.bemelon.me, DB `app_dev`)에, `main`에 머지하면 곧바로 운영(https://cmc-11th.bemelon.me, DB `app`)에 반영되므로 CI가 초록인지 확인하고 머지한다.
+  머지 뒤에는 Actions `Deploy`가 초록인지, 그 서버 `/api/health`의 `commit`이 방금 머지한 커밋인지 본다.
 - 수동 배포는 하지 않는다. `docker push`로 이미지를 직접 올리거나, `kubectl`·Argo CD 화면으로 운영 리소스를 직접 고치지 않는다.
   Argo CD는 cluster-config의 `main`과 다른 상태를 자동으로 되돌리므로(selfHeal) 손으로 고쳐도 남지 않는다.
-- `Deploy`를 수동 실행(workflow_dispatch)할 때도 `main`만 고른다. 다른 브랜치는 건너뛰어진다.
-- 문제가 생기면 cluster-config에서 해당 `deploy(be)` 커밋을 `git revert` 해 push한다(force push 금지). 이 레포의 코드는 별도 PR로 고친다.
+- `Deploy`를 수동 실행(workflow_dispatch)할 때도 `dev` 또는 `main`만 고른다. 다른 브랜치는 건너뛰어진다.
+- 문제가 생기면 cluster-config에서 해당 `deploy(be)`(운영)·`deploy(be-dev)`(dev) 커밋을 `git revert` 해 push한다(force push 금지). 이 레포의 코드는 별도 PR로 고친다.
 - 이미지는 `linux/amd64`(홈서버)로만 빌드하고, 레이어 하나가 100MB를 넘으면 레지스트리 push가 `413`으로 실패하니(Cloudflare 한도) 모델·동영상 같은 큰 파일을 이미지에 넣지 않는다.
 
 ### 비밀값
 
 - 이 저장소는 공개다. 비밀번호·토큰·API 키·Observe 키(`OBSERVE_APP_KEY`·`OBSERVE_APP_SECRET`)·`.env` 내용을 코드·문서·이슈·PR·커밋 메시지·스크린샷 어디에도 올리지 않는다.
   `.env`는 `.gitignore`에 있으며 로컬에서만 쓴다. 실수로 올렸다면 지우는 것으로 끝나지 않으니(이력에 남는다) 바로 운영자에게 알려 교체한다.
-- 운영 환경변수는 클러스터가 주입한다. 이 레포에는 **이름만** 적는다: `PORT`, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `DB_LOGGING`, `CORS_ORIGIN`, `GIT_SHA`.
-  값 중 `DB_PASSWORD`는 운영자가 클러스터 Secret으로 관리한다. 변수를 더해야 하면 cluster-config의 `apps/be/secret.yaml` 변경이 필요하니 운영자와 맞춘다.
-- DB 비밀번호는 운영자에게 직접 받고 개인 `.env`에만 둔다. 운영 DB는 백업이 없으니 `DROP`·대량 `DELETE` 전에 한 번 더 확인한다.
+- 운영·dev 환경변수는 클러스터가 주입한다. 이 레포에는 **이름만** 적는다: `PORT`, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `DB_LOGGING`, `CORS_ORIGIN`, `GIT_SHA`.
+  값 중 `DB_PASSWORD`는 운영자가 클러스터 Secret으로 관리한다. 변수를 더해야 하면 cluster-config의 `apps/be/secret.yaml`(운영)·`apps/be-dev/secret.yaml`(dev) 변경이 필요하니 운영자와 맞춘다.
+- DB 비밀번호는 운영자에게 직접 받고 개인 `.env`에만 둔다. 운영 DB(`app`)·dev DB(`app_dev`)는 백업이 없으니 `DROP`·대량 `DELETE` 전에 한 번 더 확인한다.
 
 ### 코드 계약 (바꾸면 배포가 깨진다)
 
 - `main.ts`의 `setGlobalPrefix('api')`를 유지한다. 게이트웨이가 `/api/*`를 경로 그대로 넘기고 `/api`를 떼지 않는다.
 - `GET /api/health`가 200 `{status, commit}`을 계속 돌려줘야 한다(`src/health/`). 파드의 probe가 이 경로를 쓰므로 없애거나 인증을 걸면 새 파드가 Ready가 되지 않고 롤링 업데이트가 멈춘다.
 - 컨테이너는 `PORT`(운영 3000)에서 받는다. `Dockerfile`의 포트·`GIT_SHA` build-arg를 유지한다.
-- DB 연결은 위 `DB_*` 환경변수 이름을 그대로 읽는다. 다른 이름을 만들면 운영에서 값이 들어오지 않는다. `DB_DATABASE` 값(`app`)은 클러스터가 주입하니 코드에 박지 않는다.
-- 운영 `CORS_ORIGIN`은 `https://cmc-11th.bemelon.me` 하나다. FE는 같은 origin이라 CORS 없이 `/api/...`를 부른다.
-- Swagger 문서(`/docs`)는 게이트웨이가 `/api/*`만 이 서버로 보내서 공개 주소로는 열리지 않는다. 공개 주소에서 보려면 경로를 `api/docs`로 옮긴다.
+- DB 연결은 위 `DB_*` 환경변수 이름을 그대로 읽는다. 다른 이름을 만들면 운영에서 값이 들어오지 않는다. `DB_DATABASE` 값(운영 `app`, dev `app_dev`)은 클러스터가 주입하니 코드에 박지 않는다.
+- `CORS_ORIGIN`은 서버마다 하나다: 운영 `https://cmc-11th.bemelon.me`, dev `https://cmc-11th-dev.bemelon.me`. FE는 같은 origin이라 CORS 없이 `/api/...`를 부른다.
+- Swagger 문서 경로 `/docs`를 유지한다. 게이트웨이가 `/docs*`를 이 서버로 보내서 dev·운영 공개 주소(`<주소>/docs`)에서 열린다.
+- TypeORM `synchronize`는 `false`다. 스키마는 마이그레이션으로만 바꾸고, 마이그레이션은 앱 시작 때 자동 실행되지 않으니 `npm run migration:run`으로 직접 돌린다(DB 연결 PR #3 머지 후).
 
 ### 막히면
 
