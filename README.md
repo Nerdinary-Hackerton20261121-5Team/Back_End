@@ -33,7 +33,7 @@ npm run start:dev
 실행 후 아래 주소로 접속할 수 있습니다.
 
 - API 서버: http://localhost:3000/api
-- API 문서(Swagger): http://localhost:3000/docs
+- API 문서(Swagger): http://localhost:3000/api/docs
 
 ### 환경변수
 

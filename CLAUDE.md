@@ -33,7 +33,7 @@
 ## 전역 설정 (src/main.ts)
 
 - 모든 API 경로 앞에 `/api` 접두사 (`app.setGlobalPrefix('api')`)
-- Swagger 문서: `http://localhost:3000/docs` (Bearer 인증 스키마 등록됨)
+- Swagger 문서: `http://localhost:3000/api/docs` (Bearer 인증 스키마 등록됨)
 - CORS: `CORS_ORIGIN`(콤마 구분), 비어 있으면 모든 origin 허용, `credentials: true`
 - 전역 `ValidationPipe`: `whitelist`, `forbidNonWhitelisted`, `transform` → DTO에 없는 필드는 400
 - 포트: `PORT` 환경변수, 기본 3000
