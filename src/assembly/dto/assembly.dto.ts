@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsInt, IsPositive } from 'class-validator';
+import { SessionMeDto } from '../../sessions/dto/session-response.dto.js';
 import {
   SESSION_STATUSES,
   type SessionStatus,
@@ -39,6 +40,13 @@ export class AssemblyPieceDto {
   })
   pieceId: number;
 
+  @ApiProperty({
+    description:
+      '이 조각 주인의 참가자 ID. 참가자 1명당 조각 2개라 같은 값이 2번 나온다 (누구 조각인지 표시용)',
+    example: 3,
+  })
+  participantId: number;
+
   @ApiProperty({ description: '내가 옮길 수 있는 조각인지', example: true })
   isMine: boolean;
 
@@ -74,6 +82,12 @@ export class AssemblyPieceDto {
 export class AssemblyBoardResponseDto {
   @ApiProperty({ enum: SESSION_STATUSES, example: 'ASSEMBLING' })
   status: SessionStatus;
+
+  @ApiProperty({
+    type: SessionMeDto,
+    description: '요청한 참가자. pieces[].participantId와 비교하면 내 조각이다',
+  })
+  me: SessionMeDto;
 
   @ApiProperty({
     description: '조립판 행 수 = 조각 격자 행 수(참가자 수)',
