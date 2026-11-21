@@ -11,6 +11,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiSessionIdParam } from '../common/swagger/api-params.decorators.js';
 import { Throttle } from '@nestjs/throttler';
 import { ParticipantAuth } from '../auth/participant-auth.decorator.js';
 import {
@@ -51,6 +52,7 @@ export class SessionsController {
   ) {}
 
   @Delete(':sessionId')
+  @ApiSessionIdParam()
   @ParticipantAuth()
   @ApiOperation({
     summary: '방 종료·폐기 (개설자)',
@@ -71,6 +73,7 @@ export class SessionsController {
   }
 
   @Patch(':sessionId/participants/me')
+  @ApiSessionIdParam()
   @ParticipantAuth()
   @ApiOperation({
     summary: '닉네임 설정',
@@ -92,6 +95,7 @@ export class SessionsController {
   }
 
   @Delete(':sessionId/participants/me')
+  @ApiSessionIdParam()
   @ParticipantAuth()
   @ApiOperation({
     summary: '대기실 나가기 (시작 전)',
@@ -114,6 +118,7 @@ export class SessionsController {
   }
 
   @Post(':sessionId/end')
+  @ApiSessionIdParam()
   @HttpCode(HttpStatus.OK)
   @ParticipantAuth()
   @ApiOperation({
@@ -138,6 +143,7 @@ export class SessionsController {
   }
 
   @Post(':sessionId/start')
+  @ApiSessionIdParam()
   @HttpCode(HttpStatus.OK)
   @ParticipantAuth()
   @ApiOperation({
@@ -210,6 +216,7 @@ export class SessionsController {
   }
 
   @Patch(':sessionId/image')
+  @ApiSessionIdParam()
   @ParticipantAuth()
   @ApiOperation({
     summary: '방 이미지 지정 (개설자, 시작 전)',
@@ -235,6 +242,7 @@ export class SessionsController {
   }
 
   @Get(':sessionId')
+  @ApiSessionIdParam()
   @ParticipantAuth()
   @ApiOperation({
     summary: '세션 조회',
