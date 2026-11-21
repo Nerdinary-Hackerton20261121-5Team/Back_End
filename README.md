@@ -97,7 +97,7 @@ Dockerfile           # 운영 이미지 (포트 3000)
 
 ```
 main 머지 ─▶ GitHub Actions (.github/workflows/deploy.yml)
-              ├─ build: Docker 이미지(linux/amd64) → ghcr.io/nerdinary-hackerton20261121-5team/back_end:<커밋 sha>
+              ├─ build: Docker 이미지(linux/amd64) → registry.bemelon.me/cmc-11th/back_end:<커밋 sha>
               └─ deploy: cluster-config 레포의 이미지 태그를 그 sha로 바꿔 커밋 "deploy(be): <image>"
                           └─ Argo CD가 변경을 감지해 롤링 업데이트
 ```
@@ -108,8 +108,8 @@ main 머지 ─▶ GitHub Actions (.github/workflows/deploy.yml)
 
 - PR에서는 `CI`(lint·build·test)만 돌고 배포는 일어나지 않습니다.
 - 홈서버가 amd64라 이미지는 항상 `linux/amd64`로 빌드합니다. Apple Silicon에서 직접 빌드한 이미지를 올리지 마세요.
-- ghcr 패키지는 public이어야 클러스터가 받아 갑니다. 첫 배포 뒤 이미지를 못 받으면 GitHub 패키지 설정에서 공개로 바꿉니다.
-- 배포 대상 설정은 [cluster-config](https://github.com/Nerdinary-Hackerton20261121-5Team/cluster-config) 레포에 있습니다. 필요한 secret은 `CLUSTER_CONFIG_DEPLOY_KEY`뿐입니다.
+- 이미지는 운영자의 사설 레지스트리 `registry.bemelon.me`(Zot)에 올라갑니다. CI 계정 `cmc-11th-ci`는 `cmc-11th/*` 저장소에만 push할 수 있고, 클러스터는 운영자 계정으로 받아 갑니다. 레이어 하나가 100MB를 넘으면 push가 `413`으로 실패하니(Cloudflare 한도) 큰 파일을 이미지에 넣지 마세요.
+- 배포 대상 설정은 [cluster-config](https://github.com/Nerdinary-Hackerton20261121-5Team/cluster-config) 레포에 있습니다. 필요한 레포 secret은 `ZOT_USERNAME`·`ZOT_PASSWORD`(레지스트리)와 `CLUSTER_CONFIG_DEPLOY_KEY`(cluster-config 쓰기)이며 운영자가 등록합니다.
 
 ### 롤백
 
