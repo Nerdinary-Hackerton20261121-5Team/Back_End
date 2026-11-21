@@ -28,6 +28,8 @@ import { generateInviteCode } from './invite-code.js';
 import { SessionErrors } from './sessions.errors.js';
 
 const CODE_RETRIES = 5;
+/** 랜덤 매칭 때 한 번에 뽑아 차례로 시도할 후보 방 수 */
+const RANDOM_CANDIDATES = 10;
 
 /** MySQL UNIQUE 위반이면 위반한 키 이름이 들어 있는 메시지를, 아니면 null */
 function duplicateKeyMessage(error: unknown): string | null {
@@ -89,20 +91,79 @@ export class SessionsService {
       select: { id: true },
     });
     if (!found) throw new BusinessException(SessionErrors.SESSION_NOT_FOUND);
+    return this.joinLocked(found.id, dto.clientRequestId, false);
+  }
 
+  /**
+   * 랜덤 매칭 (F-012). 랜덤 허용 + 시작 전 + 빈자리 있는 방 중 하나에 무작위로 배정한다 (AC-048).
+   * 후보를 고른 뒤 그 방을 잠그고 조건을 다시 확인해, 그사이 시작·만석이 되면 다음 후보로 넘어간다.
+   * 같은 clientRequestId로 다시 보내면 이미 배정된 방의 같은 참가자를 돌려준다 (AC-049: 두 방 동시 배정 방지).
+   */
+  async randomJoin(clientRequestId: string): Promise<SessionEntryResponseDto> {
+    const already = await this.participants.findOne({
+      where: { joinRequestId: clientRequestId, isCreator: false },
+      select: { id: true, sessionId: true },
+    });
+    if (already)
+      return this.joinLocked(already.sessionId, clientRequestId, true);
+
+    const candidates = await this.sessions
+      .createQueryBuilder('s')
+      .select('s.id', 'id')
+      .where('s.allowRandom = :allow', { allow: true })
+      .andWhere('s.status = :status', { status: 'WAITING' })
+      .andWhere(
+        '(s.maxParticipants IS NULL OR (SELECT COUNT(*) FROM participant p WHERE p.session_id = s.id) < s.maxParticipants)',
+      )
+      .orderBy('RAND()')
+      .limit(RANDOM_CANDIDATES)
+      .getRawMany<{ id: number | string }>();
+
+    for (const { id } of candidates) {
+      try {
+        return await this.joinLocked(Number(id), clientRequestId, true);
+      } catch (error) {
+        // 고르는 사이 시작됐거나 정원이 찼으면 다음 후보로
+        if (
+          error instanceof BusinessException &&
+          (error.error.code === SessionErrors.SESSION_ALREADY_STARTED.code ||
+            error.error.code === SessionErrors.SESSION_FULL.code ||
+            error.error.code === SessionErrors.SESSION_NOT_FOUND.code ||
+            error.error.code === SessionErrors.RANDOM_NOT_ALLOWED.code)
+        ) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new BusinessException(SessionErrors.NO_AVAILABLE_SESSION);
+  }
+
+  /**
+   * 세션 행을 잠근 채로 입장 조건을 확인하고 참가자를 만든다 (코드 입장·랜덤 매칭 공통).
+   * 같은 clientRequestId 재전송이면 기존 참가자를 돌려준다.
+   */
+  private joinLocked(
+    sessionId: number,
+    clientRequestId: string,
+    requireRandom: boolean,
+  ): Promise<SessionEntryResponseDto> {
     return this.dataSource.transaction(async (manager) => {
       const session = await manager.findOne(Session, {
-        where: { id: found.id },
+        where: { id: sessionId },
         lock: { mode: 'pessimistic_write' },
       });
       if (!session)
         throw new BusinessException(SessionErrors.SESSION_NOT_FOUND);
 
       const again = await manager.findOne(Participant, {
-        where: { sessionId: session.id, joinRequestId: dto.clientRequestId },
+        where: { sessionId: session.id, joinRequestId: clientRequestId },
       });
       if (again) return this.reissueToken(manager, session, again);
 
+      if (requireRandom && !session.allowRandom) {
+        throw new BusinessException(SessionErrors.RANDOM_NOT_ALLOWED);
+      }
       if (session.status !== 'WAITING') {
         throw new BusinessException(SessionErrors.SESSION_ALREADY_STARTED);
       }
@@ -121,7 +182,7 @@ export class SessionsService {
         manager.create(Participant, {
           sessionId: session.id,
           tokenHash,
-          joinRequestId: dto.clientRequestId,
+          joinRequestId: clientRequestId,
           isCreator: false,
           joinedAt: new Date(),
         }),

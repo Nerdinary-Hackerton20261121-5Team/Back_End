@@ -22,6 +22,7 @@ import {
 } from '../common/swagger/api-response.decorators.js';
 import { CreateSessionDto } from './dto/create-session.dto.js';
 import { JoinSessionDto } from './dto/join-session.dto.js';
+import { RandomJoinDto } from './dto/random-join.dto.js';
 import {
   SessionDetailResponseDto,
   SessionEntryResponseDto,
@@ -95,6 +96,23 @@ export class SessionsController {
   @ApiErrorResponses(CommonErrors.INVALID_INPUT)
   create(@Body() dto: CreateSessionDto): Promise<SessionEntryResponseDto> {
     return this.sessions.create(dto);
+  }
+
+  @Post('random-join')
+  @ApiOperation({
+    summary: '랜덤 매칭',
+    description:
+      '랜덤 참가를 허용했고, 시작 전이며, 빈자리가 있는 방 중 하나에 무작위로 입장한다. ' +
+      '배정하는 순간 조건을 다시 확인한다. 같은 clientRequestId로 다시 보내면 이미 배정된 방의 같은 참가자를 돌려준다. ' +
+      '들어갈 방이 없으면 404.',
+  })
+  @ApiSuccessResponse(SessionEntryResponseDto, { status: HttpStatus.CREATED })
+  @ApiErrorResponses(
+    CommonErrors.INVALID_INPUT,
+    SessionErrors.NO_AVAILABLE_SESSION,
+  )
+  randomJoin(@Body() dto: RandomJoinDto): Promise<SessionEntryResponseDto> {
+    return this.sessions.randomJoin(dto.clientRequestId);
   }
 
   @Post('join')

@@ -27,4 +27,14 @@ export const SessionErrors = {
     status: HttpStatus.BAD_REQUEST,
     message: '최소 4명이 입장해야 시작할 수 있습니다.',
   },
+  NO_AVAILABLE_SESSION: {
+    code: 'NO_AVAILABLE_SESSION',
+    status: HttpStatus.NOT_FOUND,
+    message: '지금 랜덤으로 들어갈 수 있는 방이 없습니다.',
+  },
+  RANDOM_NOT_ALLOWED: {
+    code: 'RANDOM_NOT_ALLOWED',
+    status: HttpStatus.CONFLICT,
+    message: '랜덤 참가를 허용하지 않은 방입니다.',
+  },
 } as const satisfies Record<string, ErrorDefinition>;

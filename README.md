@@ -74,6 +74,7 @@ Swagger에서 요청·응답 예시를 보고 바로 호출할 수 있습니다.
 | POST | `/api/images` | 이미지 업로드 (multipart, 필드명 `file`). 저장소 key와 보여주기용·썸네일 주소 반환 | - | 201 | 400 |
 | POST | `/api/sessions` | 방 만들기 (목표 시간·정원 4~6명·랜덤 허용). 세션 코드와 개설자 `participantToken` 발급. 같은 `clientRequestId` 재전송은 기존 방 반환 | - | 201 | 400 |
 | POST | `/api/sessions/join` | 세션 코드로 입장. 참가자 `participantToken` 발급 | - | 201 | 400, 404, 409(시작됨·정원 참) |
+| POST | `/api/sessions/random-join` | 랜덤 매칭. 랜덤 허용·시작 전·빈자리 있는 방에 무작위 입장. 같은 `clientRequestId` 재전송은 같은 방·같은 참가자 | - | 201 | 400, 404(들어갈 방 없음) |
 | GET | `/api/sessions/{sessionId}` | 세션 조회 (단계·남은 시간·인원·내 정보, `serverNow`) | O | 200 | 400, 401, 403, 404 |
 | POST | `/api/sessions/{sessionId}/start` | 세션 시작 (개설자, **최소 4명**). 명단 고정, 시작·종료 시각 확정, 원조각(한 행 2명)·조립 조각(원조각당 4개) 생성. 다시 보내면 처음 결과 반환 | O | 200 | 400(인원 부족 포함), 401, 403, 404 |
 | POST | `/api/sessions/{sessionId}/heartbeat` | 연결 확인 (공부 중 주기적으로). 신호가 기준 시간(기본 90초) 넘게 없으면 마지막 확인 시각으로 복원도 고정 | O | 200 | 400, 401, 403, 404 |
