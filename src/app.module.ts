@@ -20,8 +20,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ObserveModule.forRoot({
       appKey: process.env.OBSERVE_APP_KEY ?? 'YOUR_APP_KEY',
       appSecret: process.env.OBSERVE_APP_SECRET ?? 'YOUR_APP_SECRET',
-      // 운영(be)과 dev 서버(be-dev)를 Observe에서 나눠 보도록 배포 환경에서 OBSERVE_SERVICE_ID로 바꾼다.
-      serviceId: process.env.OBSERVE_SERVICE_ID ?? 'Hackathon_Back',
+      serviceId: 'Hackathon_Back',
     }),
     HealthModule,
   ],
