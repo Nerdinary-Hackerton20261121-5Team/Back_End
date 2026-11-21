@@ -171,7 +171,7 @@ export class SessionsService {
    * 방 종료·폐기 (F-006, POL-010, AC-020). 개설자만.
    * 세션을 지우면 참가자·원조각·조립 조각이 ON DELETE CASCADE로 함께 지워지고,
    * 참가자 토큰도 사라져 이후 이 방의 요청은 401로 거절된다.
-   * TODO(POL-010): 업로드 사진(upload_image_key)의 저장소 객체 삭제는 storage 담당과 연결
+   * TODO(POL-010): 업로드 사진(images.image_key)의 저장소 객체 삭제는 storage 담당과 연결
    */
   async remove(
     sessionId: number,
