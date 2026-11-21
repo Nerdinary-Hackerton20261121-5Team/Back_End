@@ -23,6 +23,9 @@ export function successBody<T>(data: T): ApiResponseBody<T> {
   };
 }
 
-export function errorBody(code: string, message: string): ApiResponseBody<null> {
+export function errorBody(
+  code: string,
+  message: string,
+): ApiResponseBody<null> {
   return { success: false, code, message, data: null };
 }
