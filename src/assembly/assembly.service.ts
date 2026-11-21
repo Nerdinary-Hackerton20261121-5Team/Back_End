@@ -55,6 +55,7 @@ export class AssemblyService {
     const placedCount = pieces.filter((p) => p.placedAt).length;
     return {
       status: session.status,
+      me: { participantId: me.participantId, isCreator: me.isCreator },
       boardRows,
       boardCols,
       totalPieces: pieces.length,
@@ -63,6 +64,7 @@ export class AssemblyService {
       slots: this.slots(pieces.length, boardCols),
       pieces: pieces.map((piece) => ({
         pieceId: piece.id,
+        participantId: piece.participantId,
         isMine: piece.participantId === me.participantId,
         colSpan: 1,
         restoration: finalOf.get(piece.participantId) ?? 0,

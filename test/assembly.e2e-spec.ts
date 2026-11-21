@@ -136,6 +136,7 @@ describe('조립·종료 API (e2e)', () => {
     const data = res.body.data;
     expect(data).toMatchObject({
       status: 'ASSEMBLING',
+      me: { participantId: members[0].participantId, isCreator: true },
       boardRows: 4,
       boardCols: 2,
       totalPieces: 8,
@@ -158,6 +159,7 @@ describe('조립·종료 API (e2e)', () => {
         (x: { pieceId: number }) => Number(x.pieceId) === Number(p.id),
       );
       expect(shown).toMatchObject({
+        participantId: p.participantId,
         isMine: p.participantId === members[0].participantId,
         placed: isAway,
         // 정답 위치는 놓이기 전까지 숨긴다
