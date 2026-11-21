@@ -10,9 +10,13 @@
 # 롤백: cluster-config 레포에서 해당 deploy(be) 커밋을 revert (README 참고)
 name: Deploy
 
+# dev 서버: dev push 도 같은 흐름으로 배포하고 cluster-config 의 apps/be-dev 를 갱신한다
+#   main → app be     → https://cmc-11th.bemelon.me      (운영)
+#   dev  → app be-dev → https://cmc-11th-dev.bemelon.me  (dev 서버, DB app_dev)
+# 이미지 저장소는 같고(back_end) 태그 sha 로 구분한다. concurrency 는 ref 별이라 main·dev 배포는 서로 막지 않는다.
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 concurrency:
@@ -21,8 +25,8 @@ concurrency:
 
 jobs:
   build:
-    # workflow_dispatch는 브랜치를 고를 수 있으므로, main이 아닌 ref는 배포하지 않는다.
-    if: github.ref == 'refs/heads/main'
+    # workflow_dispatch는 브랜치를 고를 수 있으므로, main·dev가 아닌 ref는 배포하지 않는다.
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -57,11 +61,12 @@ jobs:
 
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     permissions:
       contents: read
     uses: Nerdinary-Hackerton20261121-5Team/cluster-config/.github/workflows/deploy-image.yml@main
     with:
-      app: be
+      # main → be (운영), dev → be-dev (dev 서버)
+      app: ${{ github.ref == 'refs/heads/dev' && 'be-dev' || 'be' }}
       image: ${{ needs.build.outputs.image }}
     secrets: inherit
