@@ -1,0 +1,29 @@
+# compiled output
+/dist
+/build
+/node_modules
+/coverage
+
+# env
+.env
+.env.*
+!.env.example
+
+# 개인 설정 (공통 지침: .local은 공유 제외)
+.local/
+
+# logs
+logs
+*.log
+npm-debug.log*
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# TypeScript
+*.tsbuildinfo
