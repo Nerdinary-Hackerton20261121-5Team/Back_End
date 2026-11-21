@@ -1,5 +1,5 @@
 /**
- * 세션 시계·복원도 계산 (F-003, F-004, F-005, F-009). DB·현재 시각에 의존하지 않는 순수 함수다.
+ * 세션 시계·단절 판정 (F-003, F-004, F-005). 복원도는 focus-time.ts가 계산한다. DB·현재 시각에 의존하지 않는 순수 함수다.
  * 모든 시각은 서버 시각을 쓴다. 기기 시계를 바꿔도 결과가 바뀌지 않는다 (AC-019).
  */
 
@@ -9,14 +9,21 @@ export type SessionPhase = 'WAITING' | 'FOCUSING' | 'ASSEMBLING';
 export interface SessionTimer {
   /** 개설자가 시작한 시각. 시작 전이면 null */
   startedAt: Date | null;
-  /** 공통 목표 시간(초), 0보다 크다 */
+  /** 공통 목표 시간(초), 0보다 크다. 복원도의 분모 */
   goalSeconds: number;
+  /**
+   * 저장된 종료 시각. 방장이 조기 종료하면 startedAt + goalSeconds보다 앞당겨진다 (#78).
+   * 없으면 startedAt + goalSeconds로 계산한다.
+   */
+  endsAt?: Date | null;
 }
 
 const MS = 1000;
 
 function endsAtOf(timer: SessionTimer & { startedAt: Date }): Date {
-  return new Date(timer.startedAt.getTime() + timer.goalSeconds * MS);
+  return (
+    timer.endsAt ?? new Date(timer.startedAt.getTime() + timer.goalSeconds * MS)
+  );
 }
 
 /** 시작 전 WAITING, 집중 중 FOCUSING, 종료 시각이 지나면 ASSEMBLING (조회 시점에 계산, 스케줄러 불필요) */
@@ -26,6 +33,19 @@ export function sessionPhase(timer: SessionTimer, now: Date): SessionPhase {
     endsAtOf({ ...timer, startedAt: timer.startedAt }).getTime()
     ? 'FOCUSING'
     : 'ASSEMBLING';
+}
+
+/**
+ * 응답에 내보낼 세션 단계. 팀 통과(COMPLETED)는 조립 결과로 DB에 저장된 값을 그대로 쓰고,
+ * 나머지는 서버 시각으로 계산한다 (DB의 FOCUSING은 종료 시각이 지나도 조립을 열기 전까지 그대로라서).
+ */
+export function sessionStatus(
+  session: SessionTimer & { status: string },
+  now: Date,
+): SessionPhase | 'COMPLETED' {
+  return session.status === 'COMPLETED'
+    ? 'COMPLETED'
+    : sessionPhase(session, now);
 }
 
 /** 시작 시각 기준 종료 예정 시각 = startedAt + goalSeconds (AC-008: 이탈·화면 전환과 무관) */
@@ -46,9 +66,18 @@ export function elapsedSeconds(timer: SessionTimer, now: Date): number {
   return Math.min(Math.max(elapsed, 0), timer.goalSeconds);
 }
 
-/** 남은 시간(초). 음수가 되지 않는다 (AC-014) */
+/** 남은 시간(초). 음수가 되지 않는다 (AC-014). 조기 종료했으면 0 (#78) */
 export function remainingSeconds(timer: SessionTimer, now: Date): number {
-  return timer.goalSeconds - elapsedSeconds(timer, now);
+  if (!timer.startedAt) return timer.goalSeconds;
+  const total = Math.floor(
+    (endsAtOf({ ...timer, startedAt: timer.startedAt }).getTime() -
+      timer.startedAt.getTime()) /
+      MS,
+  );
+  return Math.max(
+    Math.min(total, timer.goalSeconds) - elapsedSeconds(timer, now),
+    0,
+  );
 }
 
 /**
@@ -66,36 +95,4 @@ export function isDisconnected(
   if (!end) return false;
   const reference = Math.min(now.getTime(), end.getTime());
   return reference - lastHeartbeatAt.getTime() > timeoutSeconds * MS;
-}
-
-/**
- * 이번 조회·heartbeat에서 새로 기록할 고정 시각. 이미 고정됐으면 null (AC-015, AC-019: 덮어쓰지 않음).
- * 끊긴 시점이 불명확하므로 마지막으로 확인한 시각(lastHeartbeatAt)으로 고정한다.
- */
-export function nextFrozenAt(
-  timer: SessionTimer,
-  participant: { lastHeartbeatAt: Date; frozenAt: Date | null },
-  now: Date,
-  timeoutSeconds: number,
-): Date | null {
-  if (participant.frozenAt) return null;
-  return isDisconnected(timer, participant.lastHeartbeatAt, now, timeoutSeconds)
-    ? participant.lastHeartbeatAt
-    : null;
-}
-
-/**
- * 복원도 0~1 (F-009). 끊긴 사람은 frozenAt에서 멈추고, 나머지는 공통 타이머를 따른다.
- *   restoration = clamp((min(frozenAt ?? now, endsAt) - startedAt) / goalSeconds, 0, 1)
- * 같은 입력이면 어느 기기에서 조회해도 같은 값이다 (AC-040).
- */
-export function restoration(
-  timer: SessionTimer,
-  frozenAt: Date | null,
-  now: Date,
-): number {
-  if (!timer.startedAt) return 0;
-  const stop = frozenAt && frozenAt.getTime() < now.getTime() ? frozenAt : now;
-  const ratio = elapsedSeconds(timer, stop) / timer.goalSeconds;
-  return Math.min(Math.max(ratio, 0), 1);
 }

@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SkipThrottle } from '@nestjs/throttler';
 import { RawResponse } from '../common/response/raw-response.decorator.js';
 
 export interface HealthResponse {
@@ -14,6 +15,8 @@ export interface HealthResponse {
  * probe와 약속한 응답 모양 { status, commit }을 지키려고 공통 응답 형식으로 감싸지 않는다.
  */
 @RawResponse()
+// 클러스터 probe가 주기적으로 부르므로 요청 횟수 제한에서 뺀다 (#67)
+@SkipThrottle()
 @Controller('health')
 export class HealthController {
   constructor(private readonly config: ConfigService) {}

@@ -16,8 +16,7 @@
 | 경로 | 역할 | Git |
 |---|---|---|
 | `src/main.ts` | 앱 생성·전역 설정·Swagger·listen | O |
-| `src/app.module.ts` | 루트 모듈. Config(전역)·Observe 등록, 기능 모듈을 여기서 import | O |
-| `src/app.controller.ts`, `src/app.service.ts` | 샘플. 실제 기능은 `src/<기능>/` 모듈로 추가 | O |
+| `src/app.module.ts` | 루트 모듈. Config(전역) 등록, 기능 모듈을 여기서 import | O |
 | `src/storage/` | 파일 저장소(`@nestjs/storage`, S3 호환 RustFS) + 이미지 주소(imgproxy 서명 URL). `POST /api/images` 업로드. S3 키가 없으면 메모리 디스크로 대신 | O |
 | `src/health/` | `GET /api/health` → 200 `{status, commit}`. 클러스터 probe가 쓰므로 경로·200 응답을 유지 | O |
 | `Dockerfile`, `.dockerignore` | 운영 이미지(포트 3000, `GIT_SHA` build-arg) | O |
@@ -29,7 +28,7 @@
 | `CLAUDE.md` | Claude Code 진입 파일 (위 두 문서 import + 이 구조 안내) | O |
 | `.claude/skills/`, `.agents/skills/` | NestJS 공식 스킬(`@nestjs/skills`). 두 폴더 내용 동일, 각각 Claude Code·기타 에이전트용 | O |
 | `.env.example` | 환경변수 예시 (`PORT`, `CORS_ORIGIN`, `DB_*`, `S3_*`, `IMGPROXY_*`) | O |
-| `.env` | 실제 환경변수·비밀값 (Observe 키 포함) | X |
+| `.env` | 실제 환경변수·비밀값 | X |
 | `.local/` | 개인 역할 설정(`role.yaml`) | X |
 | `dist/`, `node_modules/`, `*.tsbuildinfo` | 빌드·의존성 산출물 | X |
 
