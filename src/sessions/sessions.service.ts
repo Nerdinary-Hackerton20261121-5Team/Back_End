@@ -29,6 +29,7 @@ import type {
 } from './dto/session-response.dto.js';
 import { Participant } from './entities/participant.entity.js';
 import { Session, type SessionStatus } from './entities/session.entity.js';
+import { Image } from '../storage/entities/image.entity.js';
 import type { LeaveSessionResponseDto } from './dto/leave-session-response.dto.js';
 import { generateInviteCode } from './invite-code.js';
 import { SessionErrors } from './sessions.errors.js';
@@ -59,6 +60,13 @@ export class SessionsService {
       throw new BusinessException(
         CommonErrors.INVALID_INPUT,
         `목표 시간은 ${min}~${max}초 사이여야 합니다.`,
+      );
+    }
+
+    if (dto.imageKey && dto.imageId) {
+      throw new BusinessException(
+        CommonErrors.INVALID_INPUT,
+        'imageKey와 imageId 중 하나만 보내 주세요.',
       );
     }
 
@@ -306,8 +314,10 @@ export class SessionsService {
     manager: EntityManager,
     dto: CreateSessionDto,
   ): Promise<SessionEntryResponseDto> {
+    const imageId = await this.resolveImage(manager, dto);
     const session = await manager.save(
       manager.create(Session, {
+        imageId,
         sessionCode: generateInviteCode(),
         createRequestId: dto.clientRequestId,
         maxParticipants: dto.maxParticipants,
@@ -327,6 +337,30 @@ export class SessionsService {
       }),
     );
     return this.entry(session, creator, token, false);
+  }
+
+  /** 방 이미지: 업로드 key면 images 행을 만들고(같은 key면 재사용), 기본 이미지 ID면 있는지 확인한다 */
+  private async resolveImage(
+    manager: EntityManager,
+    dto: CreateSessionDto,
+  ): Promise<number | null> {
+    if (dto.imageId) {
+      const exists = await manager.existsBy(Image, { id: dto.imageId });
+      if (!exists) {
+        throw new BusinessException(
+          CommonErrors.INVALID_INPUT,
+          '이미지를 찾을 수 없습니다.',
+        );
+      }
+      return dto.imageId;
+    }
+    if (!dto.imageKey) return null;
+    const found = await manager.findOneBy(Image, { imageKey: dto.imageKey });
+    if (found) return found.id;
+    const created = await manager.save(
+      manager.create(Image, { source: 'UPLOAD', imageKey: dto.imageKey }),
+    );
+    return created.id;
   }
 
   private async restoreCreator(

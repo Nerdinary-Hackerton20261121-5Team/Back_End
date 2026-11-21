@@ -35,6 +35,20 @@ export class HeartbeatResponseDto {
   serverNow: Date;
 }
 
+export class PieceEdgesDto {
+  @ApiProperty({ enum: [-1, 0, 1], example: 0 })
+  top: number;
+
+  @ApiProperty({ enum: [-1, 0, 1], example: 1 })
+  right: number;
+
+  @ApiProperty({ enum: [-1, 0, 1], example: -1 })
+  bottom: number;
+
+  @ApiProperty({ enum: [-1, 0, 1], example: 0 })
+  left: number;
+}
+
 export class BoardPieceDto {
   @ApiProperty({
     description:
@@ -42,6 +56,22 @@ export class BoardPieceDto {
     example: 1,
   })
   position: number;
+
+  @ApiProperty({
+    type: PieceEdgesDto,
+    description:
+      '직소 모양. 변마다 1 = 탭(바깥으로 튀어나옴), -1 = 홈, 0 = 테두리. 이웃 조각과 서로 맞물린다',
+  })
+  edges: PieceEdgesDto;
+
+  @ApiProperty({
+    description:
+      '조각 이미지 경로(GET, 참가자 토큰 필요). 세션에 이미지가 없으면 null',
+    nullable: true,
+    type: String,
+    example: '/api/sessions/1/pieces/1/image',
+  })
+  imagePath: string | null;
 
   @ApiProperty({
     description:
@@ -93,6 +123,16 @@ export class BoardResponseDto {
 
   @ApiProperty({ description: '조각 격자 열 수 (항상 2)', example: 2 })
   gridCols: number;
+
+  @ApiProperty({ description: '세션에 이미지가 있는지', example: true })
+  hasImage: boolean;
+
+  @ApiProperty({
+    description:
+      '조각 이미지 여백 비율. 조각 이미지는 칸보다 좌우로 칸 너비×padRatio, 위아래로 칸 높이×padRatio만큼 크다 (탭 자리)',
+    example: 0.2,
+  })
+  padRatio: number;
 
   @ApiProperty({
     description: '내 연결이 끊겨 복원도가 고정됐는지',
