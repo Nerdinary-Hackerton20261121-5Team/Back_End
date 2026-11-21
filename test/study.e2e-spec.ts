@@ -100,40 +100,59 @@ describe('heartbeat·진행판 API (e2e)', () => {
     expect(Date.now() - me.lastHeartbeatAt!.getTime()).toBeLessThan(5 * SEC);
   });
 
-  it('200 진행판: 4명이면 2×2, 내 복원도만 공개하고 남의 것은 null', async () => {
+  it('200 진행판: 4명이면 4×2, 내 조각 2개, 내 복원도만 공개하고 남의 것은 null', async () => {
     const { host, sessionId } = await startedRoom(600);
     await rewind(sessionId, 150, 600); // 600초 중 150초 경과
-    // 둘 다 방금까지 신호를 보낸 상태로 둔다 (연결 유지)
+    // 모두 방금까지 신호를 보낸 상태로 둔다 (연결 유지)
     await participants().update({ sessionId }, { lastHeartbeatAt: new Date() });
 
     const res = await board(sessionId, host.participantToken).expect(200);
     const data = res.body.data;
     expect(data).toMatchObject({
       status: 'FOCUSING',
-      gridRows: 2,
+      gridRows: 4,
       gridCols: 2,
       myDisconnected: false,
     });
-    expect(data.pieces).toHaveLength(4);
-    const mine = data.pieces.find((p: { isMine: boolean }) => p.isMine);
-    const others = data.pieces.filter((p: { isMine: boolean }) => !p.isMine);
-    expect(mine).toMatchObject({ position: 1, colSpan: 1 });
-    expect(mine.restoration).toBeCloseTo(0.25, 1);
-    expect(mine).not.toHaveProperty('rect');
+    expect(data.pieces).toHaveLength(8);
+    expect(data.pieces.map((p: { position: number }) => p.position)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8,
+    ]);
+
+    type Piece = {
+      position: number;
+      displaySlot: number;
+      colSpan: number;
+      isMine: boolean;
+      restoration: number | null;
+    };
+    const mine = data.pieces.filter((p: Piece) => p.isMine) as Piece[];
+    const others = data.pieces.filter((p: Piece) => !p.isMine) as Piece[];
+    // 개설자는 명단 첫 번째라 첫 행(1·2번 칸)을 맡는다
+    expect(mine.map((p) => p.position)).toEqual([1, 2]);
+    for (const p of mine) {
+      expect(p.colSpan).toBe(1);
+      expect(p.restoration).toBeCloseTo(0.25, 1);
+      // 공부 중에는 내 정답 칸(1·2번)이 아닌 곳에 놓인다
+      expect([1, 2]).not.toContain(p.displaySlot);
+      expect(p).not.toHaveProperty('rect');
+    }
+    // 배치 칸은 서로 겹치지 않는다
     expect(
-      others.every(
-        (p: { restoration: number | null }) => p.restoration === null,
-      ),
-    ).toBe(true);
+      data.pieces
+        .map((p: Piece) => p.displaySlot)
+        .sort((a: number, b: number) => a - b),
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(others.every((p) => p.restoration === null)).toBe(true);
   });
 
-  it('5명이면 3×2 격자, 5번 원조각만 두 칸(colSpan 2)', async () => {
+  it('5명이면 5×2 격자, 조각 10개 모두 한 칸 크기', async () => {
     const { host, sessionId } = await startedRoom(600, 5);
     const res = await board(sessionId, host.participantToken).expect(200);
-    expect(res.body.data).toMatchObject({ gridRows: 3, gridCols: 2 });
+    expect(res.body.data).toMatchObject({ gridRows: 5, gridCols: 2 });
     expect(
       res.body.data.pieces.map((p: { colSpan: number }) => p.colSpan),
-    ).toEqual([1, 1, 1, 1, 2]);
+    ).toEqual(Array(10).fill(1));
   });
 
   it('AC-016 기준 시간 넘게 신호가 없던 사람은 마지막 확인 시각으로 고정된다', async () => {
