@@ -9,7 +9,9 @@
 
 export const BLUR_LEVELS = 10;
 export const BLUR_MAX_SIGMA = 48;
-export const BLUR_MIN_SIGMA = 14;
+// 14일 때는 90%를 넘겨도 뿌옇게 보여 다 채운 조각과 덜 채운 조각이 잘 구분되지 않았다 (칸 너비의 약 3%).
+// 원본은 주지 않되 거의 선명해 보이는 수준으로 낮춘다
+export const BLUR_MIN_SIGMA = 2;
 
 /** 복원도(0~1) → 블러 단계 0~10. 단계가 높을수록 덜 흐리다 */
 export function blurLevel(restoration: number): number {
