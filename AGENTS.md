@@ -99,8 +99,8 @@ NestJS 버전·ESM 규칙·테스트(Vitest)·Observe 관련 안내는 [NestJS �
 
 ### 브랜치·PR
 
-- 흐름은 **기능 브랜치 → PR(base `dev`) → `dev` → `dev`→`main` PR → `main`** 이다. 작업은 `dev`에서 딴 브랜치(`feat/작업명`, `fix/작업명`, `docs/작업명`, `chore/작업명`, `ci/작업명`)에서 하고 **base를 `dev`로 해서 PR**을 연다(GitHub 기본 브랜치가 `dev`다).
-  `dev`·`main`에는 직접 push하지 않고(`main`은 보호 브랜치라 승인 1명 필요) force push·rebase로 공유 이력을 고치지 않는다.
+- 흐름은 **기능 브랜치 → PR(base `dev`) → `dev` → `dev`→`main` PR → `main`** 이다. 작업은 `dev`에서 딴 브랜치(`feat/작업명`, `fix/작업명`, `docs/작업명`, `chore/작업명`, `ci/작업명`)에서 하고 **base를 `dev`로 해서 PR**을 여는 것을 기본으로 한다(PR은 권장이고, GitHub 기본 브랜치가 `dev`다).
+  `dev`·`main` 모두 PR 승인은 필요 없다. 보호 규칙은 force push·브랜치 삭제 금지뿐이므로 force push·rebase로 공유 이력을 고치지 않고 브랜치를 지우지 않는다.
 - 운영 반영은 dev 서버에서 확인한 뒤 `dev`→`main` PR을 여는 것으로만 한다. 이 PR에는 `dev`에만 있는 커밋이 모두 실리니 머지 전에 커밋 목록·diff를 확인한다.
 - 커밋은 `종류: 내용` 형식(`feat`·`fix`·`docs`·`chore`·`ci`·`refactor`·`test`)으로 기능 단위로 나눈다.
   PR 본문은 `.github/PULL_REQUEST_TEMPLATE.md` 양식을 채우고 관련 이슈는 `closes #번호`로 잇는다.
