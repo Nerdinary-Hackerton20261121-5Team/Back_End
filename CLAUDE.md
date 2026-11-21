@@ -1,6 +1,8 @@
 @AGENTS.md
 @docs/Coding/NESTJS.md
 
+브랜치·PR·배포·비밀값 규칙은 AGENTS.md 9절을 따른다. 기능 브랜치 → PR(base `main`) 순서이고 `main` 머지가 곧 운영 배포다.
+
 # 프로젝트 초기 구조 (백엔드)
 
 팀원 누구나 AI 에이전트로 작업을 시작할 때 이 구조를 기준으로 삼는다.
