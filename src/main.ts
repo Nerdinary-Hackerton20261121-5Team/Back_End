@@ -8,6 +8,8 @@ async function bootstrap() {
     instrument: ObserveInstrument,
   });
 
+  // 배포·재시작(SIGTERM) 때 Observe가 남은 텔레메트리를 보내고 끝나도록 종료 훅을 켠다.
+  app.enableShutdownHooks();
   app.setGlobalPrefix('api');
   app.enableCors({
     origin: process.env.CORS_ORIGIN?.split(',') ?? true,
