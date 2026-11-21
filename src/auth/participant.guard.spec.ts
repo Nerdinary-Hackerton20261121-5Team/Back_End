@@ -87,4 +87,11 @@ describe('ParticipantGuard', () => {
     );
     await expect(guard.canActivate(context)).resolves.toBe(true);
   });
+
+  it('숫자가 아닌 세션 ID는 토큰 확인 전에 400 INVALID_INPUT', async () => {
+    const { guard, findOne } = setup();
+    const { context } = contextWith({}, { sessionId: 'abc' });
+    expect(await errorCode(guard.canActivate(context))).toBe('INVALID_INPUT');
+    expect(findOne).not.toHaveBeenCalled();
+  });
 });

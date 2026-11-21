@@ -4,6 +4,7 @@ import type { Request } from 'express';
 import { Repository } from 'typeorm';
 import type { RequestParticipant } from '../common/decorators/current-participant.decorator.js';
 import { BusinessException } from '../common/exception/business.exception.js';
+import { CommonErrors } from '../common/exception/error-code.js';
 import { PARTICIPANT_TOKEN_HEADER } from '../common/http-headers.js';
 import { Participant } from '../sessions/entities/participant.entity.js';
 import { AuthErrors } from './auth.errors.js';
@@ -30,6 +31,17 @@ export class ParticipantGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthRequest>();
+
+    // 가드는 ParseIntPipe보다 먼저 돈다. 숫자가 아닌 세션 ID는 토큰 확인 전에 400으로 막는다.
+    const rawParam: string | string[] | undefined =
+      request.params?.[SESSION_ID_PARAM];
+    const pathSessionId = Array.isArray(rawParam) ? rawParam[0] : rawParam;
+    if (pathSessionId !== undefined && !/^\d+$/.test(pathSessionId)) {
+      throw new BusinessException(
+        CommonErrors.INVALID_INPUT,
+        `${SESSION_ID_PARAM}는 숫자여야 합니다.`,
+      );
+    }
     const header = request.headers[PARTICIPANT_TOKEN_HEADER.toLowerCase()];
     const token = (Array.isArray(header) ? header[0] : header)?.trim();
     if (!token) {
@@ -44,7 +56,6 @@ export class ParticipantGuard implements CanActivate {
       throw new BusinessException(AuthErrors.TOKEN_INVALID);
     }
 
-    const pathSessionId = request.params?.[SESSION_ID_PARAM];
     if (
       pathSessionId !== undefined &&
       Number(pathSessionId) !== participant.sessionId
