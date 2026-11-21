@@ -35,6 +35,7 @@ import {
 } from './dto/session-response.dto.js';
 import { DeleteSessionResponseDto } from './dto/delete-session-response.dto.js';
 import { LeaveSessionResponseDto } from './dto/leave-session-response.dto.js';
+import { NicknameResponseDto, UpdateNicknameDto } from './dto/nickname.dto.js';
 import { StartSessionResponseDto } from './dto/start-session-response.dto.js';
 import { SessionStartService } from './session-start.service.js';
 import { SessionErrors } from './sessions.errors.js';
@@ -66,6 +67,27 @@ export class SessionsController {
     @CurrentParticipant() me: RequestParticipant,
   ): Promise<DeleteSessionResponseDto> {
     return this.sessions.remove(sessionId, me);
+  }
+
+  @Patch(':sessionId/participants/me')
+  @ParticipantAuth()
+  @ApiOperation({
+    summary: '닉네임 설정',
+    description:
+      '함께하는 사람에게 보일 이름을 정하거나 바꾼다(앞뒤 공백 제거 후 1~20자). ' +
+      '초대 링크를 열 때 입장하고, "참여하기"를 누를 때 부르면 된다. 명단은 세션 조회의 participants로 본다.',
+  })
+  @ApiSuccessResponse(NicknameResponseDto)
+  @ApiErrorResponses(
+    CommonErrors.INVALID_INPUT,
+    SessionErrors.SESSION_NOT_FOUND,
+  )
+  updateNickname(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @CurrentParticipant() me: RequestParticipant,
+    @Body() dto: UpdateNicknameDto,
+  ): Promise<NicknameResponseDto> {
+    return this.sessions.updateNickname(sessionId, me, dto.nickname);
   }
 
   @Delete(':sessionId/participants/me')

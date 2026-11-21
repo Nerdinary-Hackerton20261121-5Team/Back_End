@@ -1,3 +1,4 @@
+import { ParticipantSummaryDto } from './nickname.dto.js';
 import { ApiProperty } from '@nestjs/swagger';
 import { ImageDto } from '../../storage/dto/image.dto.js';
 import {
@@ -112,4 +113,11 @@ export class SessionDetailResponseDto {
 
   @ApiProperty({ type: SessionMeDto })
   me: SessionMeDto;
+
+  @ApiProperty({
+    type: [ParticipantSummaryDto],
+    description:
+      '명단 (입장 순서). 대기실 표시, 진행판·조립판의 participantId로 닉네임 찾기에 쓴다',
+  })
+  participants: ParticipantSummaryDto[];
 }

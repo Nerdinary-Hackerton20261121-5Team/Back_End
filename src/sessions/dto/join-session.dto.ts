@@ -1,8 +1,9 @@
+import { OptionalNicknameDto } from './nickname.dto.js';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsString, Length } from 'class-validator';
 
-export class JoinSessionDto {
+export class JoinSessionDto extends OptionalNicknameDto {
   @ApiProperty({
     description: '세션 코드 (대소문자 구분 없음)',
     example: 'K7PX2Q',

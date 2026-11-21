@@ -1,3 +1,4 @@
+import { OptionalNicknameDto } from './nickname.dto.js';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsIn,
@@ -10,7 +11,7 @@ import {
 } from 'class-validator';
 import { ALLOWED_CAPACITIES } from '../../config/policy.js';
 
-export class CreateSessionDto {
+export class CreateSessionDto extends OptionalNicknameDto {
   @ApiProperty({
     description: '공통 목표 시간(초). 허용 범위는 정책 설정값(기본 60초~4시간)',
     example: 60,
