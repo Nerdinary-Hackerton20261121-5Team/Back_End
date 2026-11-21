@@ -7,6 +7,7 @@ import {
   Unique,
   type ValueTransformer,
 } from 'typeorm';
+import type { PresenceState } from '../../study/focus-time.js';
 import { Session } from './session.entity.js';
 
 /** DECIMAL은 드라이버가 문자열로 주므로 number로 바꾼다 */
@@ -80,11 +81,30 @@ export class Participant {
   lastHeartbeatAt: Date | null;
 
   @Column({
+    name: 'focused_ms',
+    type: 'int',
+    unsigned: true,
+    default: 0,
+    comment:
+      '누적 집중 시간(ms). 마지막 연결 확인 시각까지 얼굴이 인식된 시간의 합',
+  })
+  focusedMs: number;
+
+  @Column({
+    name: 'presence',
+    type: 'varchar',
+    length: 10,
+    default: 'FOCUSING',
+    comment: '마지막 heartbeat 상태: FOCUSING | PAUSED | AWAY',
+  })
+  presence: PresenceState;
+
+  @Column({
     name: 'disconnected_at',
     type: 'datetime',
     precision: 3,
     nullable: true,
-    comment: '연결 끊김 일시',
+    comment: '조립 시작 때 끊겨 있던 사람의 마지막 연결 확인 일시',
   })
   disconnectedAt: Date | null;
 

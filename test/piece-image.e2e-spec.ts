@@ -137,7 +137,7 @@ describe('조각 이미지 API (e2e)', () => {
     return sum;
   }
 
-  /** 시작 시각을 secondsAgo초 전으로 옮겨 복원도를 만든다 (모두 연결 유지) */
+  /** 시작 시각을 secondsAgo초 전으로 옮겨 복원도를 만든다 (모두 연결 유지, 그동안 계속 집중) */
   async function rewind(sessionId: number, secondsAgo: number) {
     const startedAt = new Date(Date.now() - secondsAgo * SEC);
     await dataSource
@@ -148,7 +148,10 @@ describe('조각 이미지 API (e2e)', () => {
       );
     await dataSource
       .getRepository(Participant)
-      .update({ sessionId }, { lastHeartbeatAt: new Date() });
+      .update(
+        { sessionId },
+        { lastHeartbeatAt: new Date(), focusedMs: secondsAgo * SEC },
+      );
   }
 
   it('업로드 imageId로 방을 만들면 그 이미지가 연결되고 진행판에 이미지 경로·모양이 나온다', async () => {

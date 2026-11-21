@@ -9,7 +9,6 @@ import { Participant } from '../sessions/entities/participant.entity.js';
 import { Session } from '../sessions/entities/session.entity.js';
 import { SessionErrors } from '../sessions/sessions.errors.js';
 import { PresenceService } from '../study/presence.service.js';
-import { restoration } from '../study/session-clock.js';
 import { AssemblyErrors } from './assembly.errors.js';
 import type {
   AssemblyBoardResponseDto,
@@ -163,7 +162,7 @@ export class AssemblyService {
 
   /**
    * 집중 시간이 끝났으면 조립을 연다. 세션 행을 잠그고 상태가 FOCUSING일 때만 하므로 한 번만 실행된다.
-   * - 최종 단절 판정 후 참가자별 최종 복원도 저장 (AC-040: 모든 기기 같은 값)
+   * - 최종 단절 판정 후 참가자별 누적 집중 시간·최종 복원도 저장 (AC-040: 모든 기기 같은 값)
    * - 집중 종료 시 접속해 있지 않은 사람의 조각은 정답 칸에 자동 배치 (AC-053, AC-054)
    */
   private async openAssembly(sessionId: number, now: Date): Promise<void> {
@@ -190,11 +189,10 @@ export class AssemblyService {
 
       const absent: number[] = [];
       for (const p of participants) {
-        // 진행판과 같은 판정(조건부 고정)으로 최종 끊김 시각을 정한다 (#76)
-        const disconnectedAt = await this.presence.settle(p, timer, now, repo);
-        const finalRestoration =
-          Math.round(restoration(timer, disconnectedAt, now) * 10_000) / 10_000;
-        await repo.update({ id: p.id }, { finalRestoration });
+        // 진행판과 같은 계산으로 누적 집중 시간·최종 복원도를 확정한다 (#76)
+        const final = this.presence.finalize(p, timer, now);
+        await repo.update({ id: p.id }, final);
+        const { disconnectedAt } = final;
         if (disconnectedAt) absent.push(p.id);
       }
 

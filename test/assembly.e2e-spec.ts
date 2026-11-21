@@ -93,9 +93,14 @@ describe('조립·종료 API (e2e)', () => {
       const last = absent.includes(m)
         ? startedAt
         : new Date(startedAt.getTime() + 595 * SEC);
-      await dataSource
-        .getRepository(Participant)
-        .update({ id: m.participantId }, { lastHeartbeatAt: last });
+      // 끝까지 있던 사람은 595초까지 얼굴이 인식돼 누적됐다고 둔다
+      await dataSource.getRepository(Participant).update(
+        { id: m.participantId },
+        {
+          lastHeartbeatAt: last,
+          focusedMs: absent.includes(m) ? 0 : 595 * SEC,
+        },
+      );
     }
   }
 

@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Header,
@@ -29,9 +30,11 @@ import {
 } from '../common/swagger/api-response.decorators.js';
 import { RawResponse } from '../common/response/raw-response.decorator.js';
 import { SessionErrors } from '../sessions/sessions.errors.js';
+import { HeartbeatRequestDto } from './dto/heartbeat.dto.js';
 import {
   BoardResponseDto,
   HeartbeatResponseDto,
+  ResultResponseDto,
 } from './dto/study-response.dto.js';
 import { PieceImageService } from './piece-image.service.js';
 import { StudyErrors } from './study.errors.js';
@@ -49,10 +52,12 @@ export class StudyController {
   @HttpCode(HttpStatus.OK)
   @ParticipantAuth()
   @ApiOperation({
-    summary: '연결 확인 (heartbeat)',
+    summary: '연결 확인·상태 보고 (heartbeat)',
     description:
-      '공부 중 heartbeatIntervalSeconds마다 보낸다. 마지막 확인 후 단절 기준 시간(기본 90초)이 지나면 끊긴 것으로 보고 ' +
-      '그 시점에 복원도를 고정한다. 고정된 뒤에는 다시 보내도 바뀌지 않는다. 공부 시간이 끝난 뒤에는 아무것도 바꾸지 않는다.',
+      '공부 중 heartbeatIntervalSeconds마다, 그리고 상태(state)가 바뀔 때 바로 보낸다. ' +
+      '서버는 직전 heartbeat의 상태가 FOCUSING(얼굴 인식)이었던 구간만 서버 시각으로 재서 누적한다. ' +
+      'PAUSED(일시정지)·AWAY(얼굴 인식 안 됨)인 구간과, 단절 기준 시간(기본 90초)을 넘겨 끊긴 구간은 쌓이지 않는다. ' +
+      '끊겼다가 다시 보내면 그때부터 이어서 쌓인다. 복원도 = 누적 집중 시간 / 목표 시간. 공부 시간이 끝난 뒤에는 아무것도 바꾸지 않는다.',
   })
   @ApiSuccessResponse(HeartbeatResponseDto)
   @ApiErrorResponses(
@@ -62,8 +67,9 @@ export class StudyController {
   heartbeat(
     @Param('sessionId', ParseIntPipe) sessionId: number,
     @CurrentParticipant() me: RequestParticipant,
+    @Body() body: HeartbeatRequestDto,
   ): Promise<HeartbeatResponseDto> {
-    return this.study.heartbeat(sessionId, me);
+    return this.study.heartbeat(sessionId, me, body?.state);
   }
 
   @Get(':sessionId/board')
@@ -71,8 +77,8 @@ export class StudyController {
   @ApiOperation({
     summary: '진행판 조회',
     description:
-      '원조각 위치·영역(0~1 좌표)과 복원도. 집중 중에는 내 조각 복원도만 주고 남의 조각은 null(블러). ' +
-      '조립 단계부터 모두 공개한다.',
+      '조각 위치·모양과 복원도, 함께 하는 사람 명단(상태·누적 집중 시간). ' +
+      '복원도(진행 링)는 모두 공개하고, 남의 조각 이미지는 복원도에 따라 블러로 준다. 조회는 아무것도 저장하지 않는다.',
   })
   @ApiSuccessResponse(BoardResponseDto)
   @ApiErrorResponses(
@@ -84,6 +90,27 @@ export class StudyController {
     @CurrentParticipant() me: RequestParticipant,
   ): Promise<BoardResponseDto> {
     return this.study.board(sessionId, me);
+  }
+
+  @Get(':sessionId/result')
+  @ParticipantAuth()
+  @ApiOperation({
+    summary: '공부 결과',
+    description:
+      '공부 시간이 끝난 뒤(ASSEMBLING·COMPLETED) 참가자별 누적 집중 시간·집중하지 못한 시간·최종 복원도. ' +
+      '공부 중이거나 시작 전이면 409 STUDY_NOT_FINISHED.',
+  })
+  @ApiSuccessResponse(ResultResponseDto)
+  @ApiErrorResponses(
+    CommonErrors.INVALID_INPUT,
+    SessionErrors.SESSION_NOT_FOUND,
+    StudyErrors.STUDY_NOT_FINISHED,
+  )
+  result(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @CurrentParticipant() me: RequestParticipant,
+  ): Promise<ResultResponseDto> {
+    return this.study.result(sessionId, me);
   }
 
   @Get(':sessionId/pieces/:position/image')

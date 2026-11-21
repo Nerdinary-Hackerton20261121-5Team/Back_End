@@ -13,21 +13,26 @@ import {
 } from '../sessions/entities/session.entity.js';
 import { SessionErrors } from '../sessions/sessions.errors.js';
 import type {
+  BoardMemberDto,
   BoardResponseDto,
   HeartbeatResponseDto,
+  ResultResponseDto,
 } from './dto/study-response.dto.js';
+import type { FocusSnapshot, PresenceState } from './focus-time.js';
 import { PresenceService } from './presence.service.js';
 import {
   elapsedSeconds,
   remainingSeconds,
-  restoration,
   sessionStatus,
   type SessionTimer,
 } from './session-clock.js';
+import { StudyErrors } from './study.errors.js';
+
+const toSeconds = (ms: number) => Math.floor(ms / 1000);
 
 /**
- * 공부 중 연결 확인과 진행판 (F-005, F-009).
- * 단절 판정·고정은 PresenceService가 한다 (조회 시점 판정, 스케줄러 없음).
+ * 공부 중 연결 확인과 진행판, 결과 (F-005, F-009).
+ * 상태·누적·복원도는 PresenceService가 계산한다. 저장은 heartbeat만 하고 조회는 계산만 한다.
  */
 @Injectable()
 export class StudyService {
@@ -43,29 +48,33 @@ export class StudyService {
   async heartbeat(
     sessionId: number,
     me: RequestParticipant,
+    presence: PresenceState = 'FOCUSING',
   ): Promise<HeartbeatResponseDto> {
     const session = await this.findSession(sessionId);
-    const participant = await this.participants.findOneByOrFail({
-      id: me.participantId,
-    });
     const now = new Date();
     const timer = this.timer(session);
     const status = this.status(session, now);
     const { intervalSeconds } = heartbeatPolicy();
 
-    let disconnectedAt = participant.disconnectedAt;
-    if (status === 'FOCUSING' && !disconnectedAt) {
-      // 너무 늦게 온 heartbeat면 이미 끊긴 것으로 보고 마지막 확인 시각으로 고정한다 (AC-016).
-      // 연결 중이면 확인 시각을 갱신하되, 그사이 다른 요청이 고정했으면 그 값을 따른다 (#52)
-      disconnectedAt =
-        (await this.presence.settle(participant, timer, now)) ??
-        (await this.presence.touch(participant.id, now));
+    let participant = await this.participants.findOneByOrFail({
+      id: me.participantId,
+    });
+    // 공부 중에만 누적한다. 끝난 뒤 마지막 구간은 조회·조립 확정 때 계산에 들어간다
+    if (status === 'FOCUSING') {
+      participant = await this.presence.report(
+        participant,
+        presence,
+        timer,
+        now,
+      );
     }
-
+    const snap = this.presence.snapshot(participant, timer, now);
     return {
       status,
-      disconnected: disconnectedAt !== null,
-      myRestoration: restoration(timer, disconnectedAt, now),
+      state: snap.state,
+      focusedSeconds: toSeconds(snap.focusedMs),
+      disconnected: snap.state === 'DISCONNECTED',
+      myRestoration: snap.restoration,
       remainingSeconds: remainingSeconds(timer, now),
       heartbeatIntervalSeconds: intervalSeconds,
       serverNow: now,
@@ -82,53 +91,45 @@ export class StudyService {
     const status = this.status(session, now);
 
     const [participants, sources] = await Promise.all([
-      this.participants.find({ where: { sessionId } }),
+      this.participants.find({
+        where: { sessionId },
+        order: { joinedAt: 'ASC', id: 'ASC' },
+      }),
       this.sourcePieces.find({ where: { sessionId } }),
     ]);
-
-    // 조회 시점에 끊긴 참가자를 판정해 고정한다
-    const disconnectedAtById = new Map<number, Date | null>();
-    for (const p of participants) {
-      disconnectedAtById.set(
-        p.id,
-        status === 'WAITING'
-          ? p.disconnectedAt
-          : await this.presence.settle(p, timer, now),
-      );
-    }
-
-    const revealAll = status === 'ASSEMBLING' || status === 'COMPLETED';
+    const snaps = this.snapshots(timer, participants, now);
+    const members: BoardMemberDto[] = participants.map((p) => {
+      const snap = snaps.get(p.id)!;
+      return {
+        participantId: p.id,
+        nickname: p.nickname,
+        isMe: p.id === me.participantId,
+        state: snap.state,
+        focusedSeconds: toSeconds(snap.focusedMs),
+        restoration: snap.restoration,
+      };
+    });
 
     const pieces = sources
       .sort((a, b) => a.position - b.position)
-      .map((source) => {
-        const isMine = source.participantId === me.participantId;
-        return {
-          position: source.position,
-          edges: pieceEdges(
-            sessionId,
-            source.position,
-            session.gridRows ?? 0,
-            session.gridCols ?? 0,
-          ),
-          imagePath: session.imageId
-            ? `/api/sessions/${sessionId}/pieces/${source.position}/image`
-            : null,
-          displaySlot: source.displaySlot,
-          // 조각 격자는 모든 칸이 한 칸 크기다 (참가자당 한 행)
-          colSpan: 1,
-          isMine,
-          // 집중 중 남의 조각은 블러로 보이도록 값을 내려주지 않는다 (실제 값은 서버가 계산 가능)
-          restoration:
-            isMine || revealAll
-              ? restoration(
-                  timer,
-                  disconnectedAtById.get(source.participantId) ?? null,
-                  now,
-                )
-              : null,
-        };
-      });
+      .map((source) => ({
+        position: source.position,
+        edges: pieceEdges(
+          sessionId,
+          source.position,
+          session.gridRows ?? 0,
+          session.gridCols ?? 0,
+        ),
+        imagePath: session.imageId
+          ? `/api/sessions/${sessionId}/pieces/${source.position}/image`
+          : null,
+        displaySlot: source.displaySlot,
+        // 조각 격자는 모든 칸이 한 칸 크기다 (참가자당 한 행)
+        colSpan: 1,
+        isMine: source.participantId === me.participantId,
+        // 진행 링은 모두 공개한다. 남의 조각 이미지는 복원도에 따라 블러 처리된다
+        restoration: snaps.get(source.participantId)?.restoration ?? 0,
+      }));
 
     return {
       status,
@@ -139,11 +140,67 @@ export class StudyService {
       gridCols: session.gridCols ?? 0,
       hasImage: session.imageId !== null,
       padRatio: PIECE_PAD_RATIO,
-      myDisconnected:
-        (disconnectedAtById.get(me.participantId) ?? null) !== null,
+      myDisconnected: snaps.get(me.participantId)?.state === 'DISCONNECTED',
+      members,
       pieces,
       serverNow: now,
     };
+  }
+
+  /** 공부가 끝난 뒤 참가자별 집중 시간·최종 복원도 */
+  async result(
+    sessionId: number,
+    me: RequestParticipant,
+  ): Promise<ResultResponseDto> {
+    const session = await this.findSession(sessionId);
+    const now = new Date();
+    const timer = this.timer(session);
+    const status = this.status(session, now);
+    if (status === 'WAITING' || status === 'FOCUSING') {
+      throw new BusinessException(StudyErrors.STUDY_NOT_FINISHED);
+    }
+
+    const participants = await this.participants.find({
+      where: { sessionId },
+      order: { joinedAt: 'ASC', id: 'ASC' },
+    });
+    const snaps = this.snapshots(timer, participants, now);
+    const members = participants.map((p) => {
+      const snap = snaps.get(p.id)!;
+      const focusedSeconds = toSeconds(snap.focusedMs);
+      return {
+        participantId: p.id,
+        nickname: p.nickname,
+        isMe: p.id === me.participantId,
+        isCreator: p.isCreator,
+        focusedSeconds,
+        unfocusedSeconds: Math.max(session.goalSeconds - focusedSeconds, 0),
+        restoration: snap.restoration,
+        absent: snap.state === 'DISCONNECTED',
+      };
+    });
+    const averageRestoration = members.length
+      ? members.reduce((sum, m) => sum + m.restoration, 0) / members.length
+      : 0;
+
+    return {
+      status,
+      goalSeconds: session.goalSeconds,
+      completed: status === 'COMPLETED',
+      averageRestoration,
+      members,
+      serverNow: now,
+    };
+  }
+
+  private snapshots(
+    timer: SessionTimer,
+    participants: Participant[],
+    now: Date,
+  ): Map<number, FocusSnapshot> {
+    return new Map(
+      participants.map((p) => [p.id, this.presence.snapshot(p, timer, now)]),
+    );
   }
 
   private async findSession(sessionId: number): Promise<Session> {

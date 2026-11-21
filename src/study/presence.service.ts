@@ -4,21 +4,23 @@ import { IsNull, Repository } from 'typeorm';
 import { heartbeatPolicy } from '../config/policy.js';
 import { Participant } from '../sessions/entities/participant.entity.js';
 import {
-  nextFrozenAt,
-  restoration,
-  type SessionTimer,
-} from './session-clock.js';
+  clampFocusMs,
+  focusSnapshot,
+  pendingFocusMs,
+  roundRestoration,
+  type FocusRecord,
+  type FocusSnapshot,
+  type PresenceState,
+} from './focus-time.js';
+import type { SessionTimer } from './session-clock.js';
 
-type PresenceRow = Pick<
-  Participant,
-  'id' | 'lastHeartbeatAt' | 'disconnectedAt'
->;
+/** 같은 참가자의 heartbeat가 겹쳤을 때 다시 시도하는 횟수 */
+const HEARTBEAT_RETRIES = 3;
 
 /**
- * 연결 끊김 판정과 복원도 계산을 한곳에서 한다 (F-005, F-009, AC-015, AC-016, AC-040, #76).
- * heartbeat·진행판·조각 이미지·조립 열기가 모두 이 서비스를 쓰므로 어디서 조회해도 같은 값이 나온다.
- * 스케줄러 없이 조회 시점에 판정하고, 고정은 조건부 갱신이라 동시 요청에도 안전하다 (#52).
- * 트랜잭션 안에서 부를 때는 그 트랜잭션의 Participant 저장소를 repo로 넘긴다.
+ * 참가자 상태·집중 시간 누적·복원도를 한곳에서 한다 (F-005, F-009, AC-040, #76).
+ * heartbeat·진행판·결과·조각 이미지·조립 열기가 모두 이 서비스를 쓰므로 어디서 조회해도 같은 값이 나온다.
+ * 저장은 heartbeat(report)와 조립 열기(finalize)만 한다. 조회는 계산만 하고 쓰지 않는다.
  */
 @Injectable()
 export class PresenceService {
@@ -27,79 +29,88 @@ export class PresenceService {
     private readonly participants: Repository<Participant>,
   ) {}
 
-  /**
-   * 끊김 시각. 이미 고정됐으면 그 값, 지금 끊긴 것으로 판정되면 마지막 연결 확인 시각으로 고정해 돌려준다.
-   * 연결 중이면 null.
-   */
-  async settle(
-    p: PresenceRow,
-    timer: SessionTimer,
-    now: Date,
-    repo: Repository<Participant> = this.participants,
-  ): Promise<Date | null> {
-    if (p.disconnectedAt) return p.disconnectedAt;
-    if (!p.lastHeartbeatAt) return null;
-    const frozenAt = nextFrozenAt(
+  /** 지금 시각 기준 상태·누적 집중 시간·복원도 (저장하지 않음) */
+  snapshot(p: FocusRecord, timer: SessionTimer, now: Date): FocusSnapshot {
+    return focusSnapshot(
       timer,
-      { lastHeartbeatAt: p.lastHeartbeatAt, frozenAt: null },
+      p,
       now,
       heartbeatPolicy().disconnectTimeoutSeconds,
     );
-    return frozenAt ? this.freeze(p.id, frozenAt, repo) : null;
+  }
+
+  /** 복원도 0~1 = 누적 집중 시간 / 목표 시간. 조립을 열 때 확정한 값이 있으면 그 값 */
+  restorationOf(p: FocusRecord, timer: SessionTimer, now: Date): number {
+    return this.snapshot(p, timer, now).restoration;
   }
 
   /**
-   * 연결 확인(heartbeat) 기록. 고정되지 않은 참가자만 갱신한다 (AC-015, AC-019: 고정값은 덮어쓰지 않음).
-   * 그사이 다른 요청이 고정했으면 그 고정 시각을, 아니면 null을 돌려준다.
+   * heartbeat 기록. 직전 상태가 FOCUSING이었던 구간을 누적하고 이번 상태를 저장한다.
+   * 읽은 마지막 확인 시각이 그대로일 때만 쓰므로 겹친 요청이 같은 구간을 두 번 더하지 않는다 (#52).
+   * 반환값은 반영 후 참가자 행.
    */
-  async touch(
-    participantId: number,
-    now: Date,
-    repo: Repository<Participant> = this.participants,
-  ): Promise<Date | null> {
-    const result = await repo.update(
-      { id: participantId, disconnectedAt: IsNull() },
-      { lastHeartbeatAt: now },
-    );
-    return result.affected ? null : this.current(participantId, repo);
-  }
-
-  /** 복원도 0~1. 조립을 열 때 확정한 최종값이 있으면 그 값, 아니면 끊김을 판정해 지금 시각으로 계산한다. */
-  async restorationOf(
-    p: PresenceRow & Pick<Participant, 'finalRestoration'>,
+  async report(
+    participant: Participant,
+    presence: PresenceState,
     timer: SessionTimer,
     now: Date,
-  ): Promise<number> {
-    if (p.finalRestoration !== null) return p.finalRestoration;
-    if (!timer.startedAt) return 0;
-    return restoration(timer, await this.settle(p, timer, now), now);
+    repo: Repository<Participant> = this.participants,
+  ): Promise<Participant> {
+    const { disconnectTimeoutSeconds } = heartbeatPolicy();
+    let row = participant;
+    for (let attempt = 0; attempt < HEARTBEAT_RETRIES; attempt++) {
+      const focusedMs = clampFocusMs(
+        timer,
+        row.focusedMs +
+          pendingFocusMs(timer, row, now, disconnectTimeoutSeconds),
+      );
+      const result = await repo.update(
+        { id: row.id, lastHeartbeatAt: row.lastHeartbeatAt ?? IsNull() },
+        { focusedMs, presence, lastHeartbeatAt: now },
+      );
+      if (result.affected) {
+        return Object.assign(row, {
+          focusedMs,
+          presence,
+          lastHeartbeatAt: now,
+        });
+      }
+      row = await repo.findOneByOrFail({ id: row.id });
+      // 더 늦은 heartbeat가 이미 반영됐으면 그 값을 따른다
+      if (
+        row.lastHeartbeatAt &&
+        row.lastHeartbeatAt.getTime() >= now.getTime()
+      ) {
+        return row;
+      }
+    }
+    return row;
   }
 
   /**
-   * 끊김 고정. 아직 고정되지 않았고 마지막 연결 확인 시각이 판정 때 읽은 값 그대로일 때만 기록한다.
-   * 그사이 heartbeat가 들어와 시각이 바뀌었으면 고정하지 않는다 (#52).
+   * 조립을 열 때 저장할 최종값. 종료 시각 기준으로 마지막 heartbeat 이후 구간까지 더해 확정한다.
+   * 종료 때 끊겨 있던 사람은 disconnectedAt(마지막 확인 시각)을 남긴다 (부재자 조각 자동 배치에 씀).
    */
-  private async freeze(
-    participantId: number,
-    frozenAt: Date,
-    repo: Repository<Participant>,
-  ): Promise<Date | null> {
-    const result = await repo.update(
+  finalize(
+    p: Participant,
+    timer: SessionTimer,
+    now: Date,
+  ): Pick<Participant, 'disconnectedAt' | 'focusedMs' | 'finalRestoration'> {
+    const snap = this.snapshot(
       {
-        id: participantId,
-        disconnectedAt: IsNull(),
-        lastHeartbeatAt: frozenAt,
+        focusedMs: p.focusedMs,
+        presence: p.presence,
+        lastHeartbeatAt: p.lastHeartbeatAt,
+        disconnectedAt: p.disconnectedAt,
+        finalRestoration: null,
       },
-      { disconnectedAt: frozenAt },
+      timer,
+      now,
     );
-    return result.affected ? frozenAt : this.current(participantId, repo);
-  }
-
-  private async current(
-    participantId: number,
-    repo: Repository<Participant>,
-  ): Promise<Date | null> {
-    const row = await repo.findOneBy({ id: participantId });
-    return row?.disconnectedAt ?? null;
+    return {
+      disconnectedAt: snap.state === 'DISCONNECTED' ? p.lastHeartbeatAt : null,
+      focusedMs: Math.round(snap.focusedMs),
+      finalRestoration: roundRestoration(snap.restoration),
+    };
   }
 }
