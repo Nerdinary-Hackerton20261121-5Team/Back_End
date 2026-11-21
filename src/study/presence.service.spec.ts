@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Repository } from 'typeorm';
 import type { Participant } from '../sessions/entities/participant.entity.js';
 import { PresenceService } from './presence.service.js';
-import { sessionStatus } from './session-clock.js';
+import {
+  elapsedSeconds,
+  remainingSeconds,
+  restoration,
+  sessionStatus,
+} from './session-clock.js';
 
 // #76 끊김 판정·복원도·단계 계산을 한곳에서 (F-005, F-009, AC-040)
 const START = new Date('2026-11-22T03:00:00.000Z');
@@ -91,5 +96,26 @@ describe('sessionStatus (#76)', () => {
         sec(0),
       ),
     ).toBe('WAITING');
+  });
+});
+
+describe('조기 종료 시계 (#78)', () => {
+  // 50분 목표, 20분에 방장이 종료
+  const early = { ...timer, goalSeconds: 3000, endsAt: sec(1200) };
+
+  it('끝난 시각부터는 ASSEMBLING, 남은 시간 0, 경과는 종료 시각에서 멈춘다', () => {
+    expect(sessionStatus({ ...early, status: 'FOCUSING' }, sec(1199))).toBe(
+      'FOCUSING',
+    );
+    expect(sessionStatus({ ...early, status: 'FOCUSING' }, sec(1200))).toBe(
+      'ASSEMBLING',
+    );
+    expect(remainingSeconds(early, sec(1500))).toBe(0);
+    expect(remainingSeconds(early, sec(600))).toBe(600);
+    expect(elapsedSeconds(early, sec(1500))).toBe(1200);
+  });
+
+  it('복원도는 원래 목표 기준 (20분 / 50분 = 40%)', () => {
+    expect(restoration(early, null, sec(1500))).toBeCloseTo(0.4);
   });
 });

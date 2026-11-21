@@ -181,6 +181,7 @@ export class AssemblyService {
       const timer = {
         startedAt: session.startedAt,
         goalSeconds: session.goalSeconds,
+        endsAt: session.endsAt,
       };
       const participants = await manager.find(Participant, {
         where: { sessionId },

@@ -34,6 +34,7 @@ import {
   SessionEntryResponseDto,
 } from './dto/session-response.dto.js';
 import { DeleteSessionResponseDto } from './dto/delete-session-response.dto.js';
+import { EndFocusResponseDto } from './dto/end-focus-response.dto.js';
 import { LeaveSessionResponseDto } from './dto/leave-session-response.dto.js';
 import { NicknameResponseDto, UpdateNicknameDto } from './dto/nickname.dto.js';
 import { StartSessionResponseDto } from './dto/start-session-response.dto.js';
@@ -110,6 +111,30 @@ export class SessionsController {
     @CurrentParticipant() me: RequestParticipant,
   ): Promise<LeaveSessionResponseDto> {
     return this.sessions.leave(sessionId, me);
+  }
+
+  @Post(':sessionId/end')
+  @HttpCode(HttpStatus.OK)
+  @ParticipantAuth()
+  @ApiOperation({
+    summary: '공부 조기 종료 (방장)',
+    description:
+      '모두의 공부를 지금 끝내고 조립 단계로 넘긴다(Figma 07 "종료"). 종료 시각을 지금으로 당기며, ' +
+      '복원도는 원래 목표 시간 기준이다(50분 목표에서 20분에 끝내면 40%). 이후 조립판 조회로 조립을 시작한다. ' +
+      '이미 끝난 세션에 다시 보내면 처음 끝난 시각을 그대로 돌려준다. 방을 지우는 것은 DELETE(방 삭제)다.',
+  })
+  @ApiSuccessResponse(EndFocusResponseDto)
+  @ApiErrorResponses(
+    CommonErrors.INVALID_INPUT,
+    SessionErrors.NOT_CREATOR,
+    SessionErrors.SESSION_NOT_FOUND,
+    SessionErrors.FOCUS_NOT_STARTED,
+  )
+  endFocus(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @CurrentParticipant() me: RequestParticipant,
+  ): Promise<EndFocusResponseDto> {
+    return this.sessions.endFocus(sessionId, me);
   }
 
   @Post(':sessionId/start')
