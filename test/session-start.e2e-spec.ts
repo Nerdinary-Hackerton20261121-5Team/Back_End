@@ -79,21 +79,17 @@ describe('세션 시작 API (e2e)', () => {
     });
     expect(Date.parse(data.endsAt) - Date.parse(data.startedAt)).toBe(60_000);
 
-    const sources = await dataSource
-      .getRepository(SourcePiece)
-      .find({
-        where: { sessionId: room.sessionId },
-        order: { position: 'ASC' },
-      });
+    const sources = await dataSource.getRepository(SourcePiece).find({
+      where: { sessionId: room.sessionId },
+      order: { position: 'ASC' },
+    });
     expect(sources.map((s) => s.position)).toEqual([1, 2, 3, 4]);
     expect(new Set(sources.map((s) => s.participantId)).size).toBe(4);
 
-    const pieces = await dataSource
-      .getRepository(AssemblyPiece)
-      .find({
-        where: { sessionId: room.sessionId },
-        order: { position: 'ASC' },
-      });
+    const pieces = await dataSource.getRepository(AssemblyPiece).find({
+      where: { sessionId: room.sessionId },
+      order: { position: 'ASC' },
+    });
     expect(pieces.map((p) => p.position)).toEqual(
       Array.from({ length: 16 }, (_, i) => i + 1),
     );
@@ -120,19 +116,23 @@ describe('세션 시작 API (e2e)', () => {
     });
   });
 
-  it('AC-024 혼자 시작하면 원조각 1개·조립 조각 4개', async () => {
-    const room = await roomWith(1);
-    const res = await start(room.sessionId, room.participantToken).expect(200);
-    expect(res.body.data).toMatchObject({
-      participantCount: 1,
-      gridRows: 1,
-      gridCols: 1,
-      assemblyPieceCount: 4,
-    });
-  });
+  it.each([1, 3])(
+    '400: %i명이면 최소 인원 부족으로 시작할 수 없다',
+    async (people) => {
+      const room = await roomWith(people);
+      const res = await start(room.sessionId, room.participantToken).expect(
+        400,
+      );
+      expect(res.body.code).toBe('NOT_ENOUGH_PARTICIPANTS');
+      const pieces = await dataSource
+        .getRepository(AssemblyPiece)
+        .count({ where: { sessionId: room.sessionId } });
+      expect(pieces).toBe(0);
+    },
+  );
 
   it('AC-010 다시 시작해도 처음 시작 기준을 그대로 돌려준다', async () => {
-    const room = await roomWith(2);
+    const room = await roomWith(4);
     const first = await start(room.sessionId, room.participantToken).expect(
       200,
     );
@@ -143,17 +143,17 @@ describe('세션 시작 API (e2e)', () => {
     expect(again.body.data).toMatchObject({
       startedAt: first.body.data.startedAt,
       endsAt: first.body.data.endsAt,
-      participantCount: 2,
+      participantCount: 4,
       alreadyStarted: true,
     });
     const count = await dataSource
       .getRepository(AssemblyPiece)
       .count({ where: { sessionId: room.sessionId } });
-    expect(count).toBe(8);
+    expect(count).toBe(16);
   });
 
   it('AC-005 시작 후 입장은 409, 조회하면 FOCUSING', async () => {
-    const room = await roomWith(2);
+    const room = await roomWith(4);
     await start(room.sessionId, room.participantToken).expect(200);
 
     const res = await http()
@@ -168,7 +168,7 @@ describe('세션 시작 API (e2e)', () => {
       .expect(200);
     expect(detail.body.data).toMatchObject({
       status: 'FOCUSING',
-      participantCount: 2,
+      participantCount: 4,
     });
   });
 
