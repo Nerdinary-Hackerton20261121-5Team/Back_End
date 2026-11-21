@@ -3,7 +3,7 @@
  *
  * 블러 강도는 조각 주인의 진행도(복원도 0~1)로 정한다. 진행도는 참가자 단위라 같은 사람의 조각 2개는 항상 같은 단계다.
  * - 10% 단위 단계(0~10)로 나눈다. 같은 단계면 같은 이미지라 캐시를 다시 쓴다.
- * - 0%가 가장 흐리고, 100%여도 BLUR_MIN_SIGMA 이상 흐리게 둔다.
+ * - 0%가 가장 흐리고, 100%여도 BLUR_MIN_SIGMA 이상 흐리게 둔다. 진행할수록 빠르게 선명해진다(남은 비율의 제곱).
  * sigma는 조각 이미지의 칸 너비(PIECE_CELL_WIDTH px) 기준이다.
  */
 
@@ -22,8 +22,10 @@ export function blurLevel(restoration: number): number {
 /** 블러 단계 → sigma. 100%(단계 10)여도 0이 되지 않는다 */
 export function blurSigma(level: number): number {
   const step = Math.min(BLUR_LEVELS, Math.max(0, level));
+  // 남은 비율의 제곱으로 줄인다. 직선으로 줄이면 80%를 채워도 뿌옇게 보여, 절반을 넘기면 빠르게 선명해지게 한다
+  // (0% 48, 50% 13.5, 80% 3.8, 90% 2.5, 100% 2)
+  const remaining = (BLUR_LEVELS - step) / BLUR_LEVELS;
   return (
-    BLUR_MIN_SIGMA +
-    ((BLUR_MAX_SIGMA - BLUR_MIN_SIGMA) * (BLUR_LEVELS - step)) / BLUR_LEVELS
+    BLUR_MIN_SIGMA + (BLUR_MAX_SIGMA - BLUR_MIN_SIGMA) * remaining * remaining
   );
 }
