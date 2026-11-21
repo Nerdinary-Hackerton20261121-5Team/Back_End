@@ -1,0 +1,17 @@
+node_modules
+dist
+coverage
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.local
+.git
+.github
+.claude
+.agents
+docs
+test
+*.md
+Dockerfile
+.dockerignore
