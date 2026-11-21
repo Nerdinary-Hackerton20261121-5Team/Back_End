@@ -10,7 +10,7 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ParticipantAuth } from '../auth/participant-auth.decorator.js';
 import {
@@ -174,6 +174,21 @@ export class SessionsController {
     description:
       '목표 시간·정원(4~6명)으로 방을 만든다. 개설자도 참가자로 등록되며 응답의 participantToken을 Authorize에 넣는다. ' +
       '최소 4명이 모이면 개설자가 시작할 수 있다.',
+  })
+  // 스키마 예시는 imageKey·imageId를 함께 채워 그대로 보내면 400이 난다. 수정 없이 실행되는 본문을 따로 준다
+  @ApiBody({
+    type: CreateSessionDto,
+    examples: {
+      basic: {
+        summary: '사진 없이 만들기 (그대로 실행 가능)',
+        value: {
+          nickname: '비둘기',
+          goalSeconds: 60,
+          maxParticipants: 4,
+          clientRequestId: '6f1c2a5e-4b7d-4e1a-9f3c-2d8b7a6e5f40',
+        },
+      },
+    },
   })
   @ApiSuccessResponse(SessionEntryResponseDto, { status: HttpStatus.CREATED })
   @ApiErrorResponses(
