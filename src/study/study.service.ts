@@ -5,6 +5,7 @@ import type { RequestParticipant } from '../common/decorators/current-participan
 import { BusinessException } from '../common/exception/business.exception.js';
 import { heartbeatPolicy } from '../config/policy.js';
 import { SourcePiece } from '../puzzle/entities/source-piece.entity.js';
+import { PIECE_PAD_RATIO, pieceEdges } from '../puzzle/piece-shape.js';
 import { Participant } from '../sessions/entities/participant.entity.js';
 import {
   Session,
@@ -129,6 +130,15 @@ export class StudyService {
         const isMine = source.participantId === me.participantId;
         return {
           position: source.position,
+          edges: pieceEdges(
+            sessionId,
+            source.position,
+            session.gridRows ?? 0,
+            session.gridCols ?? 0,
+          ),
+          imagePath: session.imageId
+            ? `/api/sessions/${sessionId}/pieces/${source.position}/image`
+            : null,
           displaySlot: source.displaySlot,
           // 조각 격자는 모든 칸이 한 칸 크기다 (참가자당 한 행)
           colSpan: 1,
@@ -152,6 +162,8 @@ export class StudyService {
       remainingSeconds: remainingSeconds(timer, now),
       gridRows: session.gridRows ?? 0,
       gridCols: session.gridCols ?? 0,
+      hasImage: session.imageId !== null,
+      padRatio: PIECE_PAD_RATIO,
       myDisconnected:
         (disconnectedAtById.get(me.participantId) ?? null) !== null,
       pieces,

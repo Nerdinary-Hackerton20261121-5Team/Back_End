@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module.js';
 import { SourcePiece } from '../puzzle/entities/source-piece.entity.js';
 import { Participant } from '../sessions/entities/participant.entity.js';
 import { Session } from '../sessions/entities/session.entity.js';
+import { PieceImageService } from './piece-image.service.js';
 import { StudyController } from './study.controller.js';
 import { StudyService } from './study.service.js';
 
@@ -13,6 +14,6 @@ import { StudyService } from './study.service.js';
     AuthModule,
   ],
   controllers: [StudyController],
-  providers: [StudyService],
+  providers: [StudyService, PieceImageService],
 })
 export class StudyModule {}

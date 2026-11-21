@@ -1,13 +1,22 @@
 import {
   Controller,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
   ParseIntPipe,
   Post,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiProduces,
+  ApiTags,
+} from '@nestjs/swagger';
+import type { Response } from 'express';
 import { ParticipantAuth } from '../auth/participant-auth.decorator.js';
 import {
   CurrentParticipant,
@@ -18,17 +27,23 @@ import {
   ApiErrorResponses,
   ApiSuccessResponse,
 } from '../common/swagger/api-response.decorators.js';
+import { RawResponse } from '../common/response/raw-response.decorator.js';
 import { SessionErrors } from '../sessions/sessions.errors.js';
 import {
   BoardResponseDto,
   HeartbeatResponseDto,
 } from './dto/study-response.dto.js';
+import { PieceImageService } from './piece-image.service.js';
+import { StudyErrors } from './study.errors.js';
 import { StudyService } from './study.service.js';
 
 @ApiTags('study')
 @Controller('sessions')
 export class StudyController {
-  constructor(private readonly study: StudyService) {}
+  constructor(
+    private readonly study: StudyService,
+    private readonly pieceImages: PieceImageService,
+  ) {}
 
   @Post(':sessionId/heartbeat')
   @HttpCode(HttpStatus.OK)
@@ -69,5 +84,42 @@ export class StudyController {
     @CurrentParticipant() me: RequestParticipant,
   ): Promise<BoardResponseDto> {
     return this.study.board(sessionId, me);
+  }
+
+  @Get(':sessionId/pieces/:position/image')
+  @ParticipantAuth()
+  // 이미지 바이트를 그대로 보낸다 (공통 { data } 응답으로 감싸지 않음)
+  @RawResponse()
+  // 블러 단계가 진행도에 따라 바뀌므로 오래 캐시하지 않는다
+  @Header('Cache-Control', 'private, max-age=10')
+  @ApiOperation({
+    summary: '조각 이미지',
+    description:
+      '정답 칸 position(1부터) 조각을 직소 모양으로 오린 투명 배경 WebP. 크기는 칸보다 사방으로 ' +
+      'padRatio(진행판 응답)만큼 크다. 내 조각은 선명하게, 남의 조각은 주인의 복원도에 따라 흐리게 주며 ' +
+      '100%여도 원본은 주지 않는다. 같은 사람의 조각 2개는 같은 단계로 흐려진다. ' +
+      '응답 헤더 X-Piece-Blur-Level: none(내 조각) 또는 0~10(높을수록 덜 흐림).',
+  })
+  @ApiProduces('image/webp')
+  @ApiOkResponse({
+    description: '조각 이미지 (image/webp)',
+    content: { 'image/webp': { schema: { type: 'string', format: 'binary' } } },
+  })
+  @ApiErrorResponses(
+    CommonErrors.INVALID_INPUT,
+    SessionErrors.SESSION_NOT_FOUND,
+    StudyErrors.PIECE_NOT_FOUND,
+    StudyErrors.SESSION_IMAGE_NOT_SET,
+  )
+  async pieceImage(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @Param('position', ParseIntPipe) position: number,
+    @CurrentParticipant() me: RequestParticipant,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const image = await this.pieceImages.render(sessionId, position, me);
+    res.setHeader('X-Piece-Blur-Level', image.blurLevel ?? 'none');
+    // @Header로 Content-Type을 주면 Express가 charset을 붙이므로 여기서 지정한다
+    return new StreamableFile(image.body, { type: 'image/webp' });
   }
 }
