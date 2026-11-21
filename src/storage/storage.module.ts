@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { StorageModule as NestStorageModule } from '@nestjs/storage';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuthModule } from '../auth/auth.module.js';
 import { Image } from './entities/image.entity.js';
 import { ImageUrlService } from './image-url.service.js';
 import { ImagesController } from './images.controller.js';
@@ -21,7 +20,6 @@ import { createStorageOptions } from './storage.config.js';
       useFactory: () => createStorageOptions(),
     }),
     TypeOrmModule.forFeature([Image]),
-    AuthModule,
   ],
   controllers: [ImagesController],
   providers: [ImageUrlService, ImagesService],
