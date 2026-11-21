@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import type { RequestParticipant } from '../common/decorators/current-participant.decorator.js';
 import { BusinessException } from '../common/exception/business.exception.js';
 import { heartbeatPolicy } from '../config/policy.js';
@@ -16,18 +16,18 @@ import type {
   BoardResponseDto,
   HeartbeatResponseDto,
 } from './dto/study-response.dto.js';
+import { PresenceService } from './presence.service.js';
 import {
   elapsedSeconds,
-  nextFrozenAt,
   remainingSeconds,
   restoration,
-  sessionPhase,
+  sessionStatus,
   type SessionTimer,
 } from './session-clock.js';
 
 /**
  * 공부 중 연결 확인과 진행판 (F-005, F-009).
- * 단절은 스케줄러 없이 heartbeat·진행판 조회 시점에 판정한다.
+ * 단절 판정·고정은 PresenceService가 한다 (조회 시점 판정, 스케줄러 없음).
  */
 @Injectable()
 export class StudyService {
@@ -37,6 +37,7 @@ export class StudyService {
     private readonly participants: Repository<Participant>,
     @InjectRepository(SourcePiece)
     private readonly sourcePieces: Repository<SourcePiece>,
+    private readonly presence: PresenceService,
   ) {}
 
   async heartbeat(
@@ -50,35 +51,15 @@ export class StudyService {
     const now = new Date();
     const timer = this.timer(session);
     const status = this.status(session, now);
-    const { intervalSeconds, disconnectTimeoutSeconds } = heartbeatPolicy();
+    const { intervalSeconds } = heartbeatPolicy();
 
     let disconnectedAt = participant.disconnectedAt;
     if (status === 'FOCUSING' && !disconnectedAt) {
-      const frozenAt = participant.lastHeartbeatAt
-        ? nextFrozenAt(
-            timer,
-            {
-              lastHeartbeatAt: participant.lastHeartbeatAt,
-              frozenAt: null,
-            },
-            now,
-            disconnectTimeoutSeconds,
-          )
-        : null;
-      if (frozenAt) {
-        // 너무 늦게 온 heartbeat: 이미 끊긴 것으로 보고 마지막 확인 시각으로 고정 (AC-016)
-        disconnectedAt = await this.freeze(participant.id, frozenAt);
-      } else {
-        // 고정되지 않은 참가자만 갱신한다. 고정값은 덮어쓰지 않는다 (AC-015, AC-019)
-        const result = await this.participants.update(
-          { id: participant.id, disconnectedAt: IsNull() },
-          { lastHeartbeatAt: now },
-        );
-        // 그사이 다른 요청이 고정했으면 고정된 값 기준으로 응답한다 (#52)
-        if (!result.affected) {
-          disconnectedAt = await this.currentDisconnectedAt(participant.id);
-        }
-      }
+      // 너무 늦게 온 heartbeat면 이미 끊긴 것으로 보고 마지막 확인 시각으로 고정한다 (AC-016).
+      // 연결 중이면 확인 시각을 갱신하되, 그사이 다른 요청이 고정했으면 그 값을 따른다 (#52)
+      disconnectedAt =
+        (await this.presence.settle(participant, timer, now)) ??
+        (await this.presence.touch(participant.id, now));
     }
 
     return {
@@ -106,20 +87,14 @@ export class StudyService {
     ]);
 
     // 조회 시점에 끊긴 참가자를 판정해 고정한다
-    const { disconnectTimeoutSeconds } = heartbeatPolicy();
     const disconnectedAtById = new Map<number, Date | null>();
     for (const p of participants) {
-      let disconnectedAt = p.disconnectedAt;
-      if (status !== 'WAITING' && !disconnectedAt && p.lastHeartbeatAt) {
-        const frozenAt = nextFrozenAt(
-          timer,
-          { lastHeartbeatAt: p.lastHeartbeatAt, frozenAt: null },
-          now,
-          disconnectTimeoutSeconds,
-        );
-        if (frozenAt) disconnectedAt = await this.freeze(p.id, frozenAt);
-      }
-      disconnectedAtById.set(p.id, disconnectedAt);
+      disconnectedAtById.set(
+        p.id,
+        status === 'WAITING'
+          ? p.disconnectedAt
+          : await this.presence.settle(p, timer, now),
+      );
     }
 
     const revealAll = status === 'ASSEMBLING' || status === 'COMPLETED';
@@ -171,37 +146,6 @@ export class StudyService {
     };
   }
 
-  /**
-   * 끊김 고정. 고정 시각은 판정에 쓴 마지막 연결 확인 시각(frozenAt)이다.
-   * 아직 고정되지 않았고, 마지막 연결 확인 시각이 판정 때 읽은 값 그대로일 때만 기록한다.
-   * 그사이 heartbeat가 들어와 시각이 바뀌었으면 고정하지 않는다 (#52, AC-015·AC-016).
-   * 반환값은 실제 저장된 고정 시각(이미 고정돼 있었으면 그 값), 고정되지 않았으면 null.
-   */
-  private async freeze(
-    participantId: number,
-    frozenAt: Date,
-  ): Promise<Date | null> {
-    const result = await this.participants.update(
-      {
-        id: participantId,
-        disconnectedAt: IsNull(),
-        lastHeartbeatAt: frozenAt,
-      },
-      { disconnectedAt: frozenAt },
-    );
-    if (result.affected) return frozenAt;
-    return this.currentDisconnectedAt(participantId);
-  }
-
-  private async currentDisconnectedAt(
-    participantId: number,
-  ): Promise<Date | null> {
-    const current = await this.participants.findOneByOrFail({
-      id: participantId,
-    });
-    return current.disconnectedAt;
-  }
-
   private async findSession(sessionId: number): Promise<Session> {
     const session = await this.sessions.findOneBy({ id: sessionId });
     if (!session) throw new BusinessException(SessionErrors.SESSION_NOT_FOUND);
@@ -213,8 +157,6 @@ export class StudyService {
   }
 
   private status(session: Session, now: Date): SessionStatus {
-    return session.status === 'COMPLETED'
-      ? 'COMPLETED'
-      : sessionPhase(this.timer(session), now);
+    return sessionStatus(session, now);
   }
 }

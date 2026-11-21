@@ -4,12 +4,12 @@ import { DataSource, EntityManager, In, IsNull, Not } from 'typeorm';
 import type { RequestParticipant } from '../common/decorators/current-participant.decorator.js';
 import { BusinessException } from '../common/exception/business.exception.js';
 import { CommonErrors } from '../common/exception/error-code.js';
-import { heartbeatPolicy } from '../config/policy.js';
 import { SourcePiece } from '../puzzle/entities/source-piece.entity.js';
 import { Participant } from '../sessions/entities/participant.entity.js';
 import { Session } from '../sessions/entities/session.entity.js';
 import { SessionErrors } from '../sessions/sessions.errors.js';
-import { nextFrozenAt, restoration } from '../study/session-clock.js';
+import { PresenceService } from '../study/presence.service.js';
+import { restoration } from '../study/session-clock.js';
 import { AssemblyErrors } from './assembly.errors.js';
 import type {
   AssemblyBoardResponseDto,
@@ -26,7 +26,10 @@ import type {
  */
 @Injectable()
 export class AssemblyService {
-  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly presence: PresenceService,
+  ) {}
 
   async board(
     sessionId: number,
@@ -179,30 +182,18 @@ export class AssemblyService {
         startedAt: session.startedAt,
         goalSeconds: session.goalSeconds,
       };
-      const { disconnectTimeoutSeconds } = heartbeatPolicy();
       const participants = await manager.find(Participant, {
         where: { sessionId },
       });
+      const repo = manager.getRepository(Participant);
 
       const absent: number[] = [];
       for (const p of participants) {
-        const disconnectedAt =
-          p.disconnectedAt ??
-          (p.lastHeartbeatAt
-            ? nextFrozenAt(
-                timer,
-                { lastHeartbeatAt: p.lastHeartbeatAt, frozenAt: null },
-                now,
-                disconnectTimeoutSeconds,
-              )
-            : null);
+        // 진행판과 같은 판정(조건부 고정)으로 최종 끊김 시각을 정한다 (#76)
+        const disconnectedAt = await this.presence.settle(p, timer, now, repo);
         const finalRestoration =
           Math.round(restoration(timer, disconnectedAt, now) * 10_000) / 10_000;
-        await manager.update(
-          Participant,
-          { id: p.id },
-          { disconnectedAt, finalRestoration },
-        );
+        await repo.update({ id: p.id }, { finalRestoration });
         if (disconnectedAt) absent.push(p.id);
       }
 
