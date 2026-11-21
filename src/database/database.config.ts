@@ -17,6 +17,9 @@ export function createDatabaseOptions(
     database: env.DB_DATABASE,
     charset: 'utf8mb4',
     timezone: 'Z', // 시각은 UTC로 저장한다
+    // BIGINT id를 문자열이 아닌 number로 받는다 (2^53을 넘는 값만 문자열)
+    supportBigNumbers: true,
+    bigNumberStrings: false,
     // 스키마는 마이그레이션으로만 바꾼다. synchronize는 컬럼·데이터를 지울 수 있어 끈다.
     synchronize: false,
     logging: env.DB_LOGGING === 'true',
