@@ -18,9 +18,6 @@ export const SESSION_STATUSES = [
 ] as const;
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
 
-export const IMAGE_SOURCES = ['DEFAULT', 'UPLOAD'] as const;
-export type ImageSource = (typeof IMAGE_SOURCES)[number];
-
 /** 세션(방). 삭제하면 참가자·원조각·조립 조각이 함께 삭제된다 (AC-020). */
 @Entity({ name: 'session', comment: '세션' })
 @Unique('uk_session_code', ['sessionCode'])
@@ -72,53 +69,19 @@ export class Session {
   allowRandom: boolean;
 
   @Column({
-    name: 'image_source',
-    type: 'varchar',
-    length: 10,
-    nullable: true,
-    comment: '이미지 출처: DEFAULT | UPLOAD',
-  })
-  imageSource: ImageSource | null;
-
-  @Column({
-    name: 'default_image_id',
+    name: 'image_id',
     type: 'bigint',
     nullable: true,
-    comment: '기본 이미지 ID',
+    comment: '퍼즐 이미지 ID',
   })
-  defaultImageId: number | null;
+  imageId: number | null;
 
   @ManyToOne(() => Image, { nullable: true })
   @JoinColumn({
-    name: 'default_image_id',
-    foreignKeyConstraintName: 'fk_session_default_image',
+    name: 'image_id',
+    foreignKeyConstraintName: 'fk_session_image',
   })
-  defaultImage?: Image | null;
-
-  @Column({
-    name: 'upload_image_key',
-    type: 'varchar',
-    length: 300,
-    nullable: true,
-    comment: '업로드 이미지 키',
-  })
-  uploadImageKey: string | null;
-
-  @Column({
-    name: 'image_width',
-    type: 'int',
-    nullable: true,
-    comment: '이미지 가로 크기',
-  })
-  imageWidth: number | null;
-
-  @Column({
-    name: 'image_height',
-    type: 'int',
-    nullable: true,
-    comment: '이미지 세로 크기',
-  })
-  imageHeight: number | null;
+  image?: Image | null;
 
   @Column({
     name: 'grid_rows',
