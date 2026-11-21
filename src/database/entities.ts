@@ -2,7 +2,7 @@ import { AssemblyPiece } from '../assembly/entities/assembly-piece.entity.js';
 import { SourcePiece } from '../puzzle/entities/source-piece.entity.js';
 import { Participant } from '../sessions/entities/participant.entity.js';
 import { Session } from '../sessions/entities/session.entity.js';
-import { DefaultImage } from '../storage/entities/default-image.entity.js';
+import { Image } from '../storage/entities/image.entity.js';
 import { User } from '../users/entities/user.entity.js';
 
 /**
@@ -11,7 +11,7 @@ import { User } from '../users/entities/user.entity.js';
  */
 export const ENTITIES = [
   User,
-  DefaultImage,
+  Image,
   Session,
   Participant,
   SourcePiece,

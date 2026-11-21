@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
   Unique,
 } from 'typeorm';
-import { DefaultImage } from '../../storage/entities/default-image.entity.js';
+import { Image } from '../../storage/entities/image.entity.js';
 
 /** 진행 단계. WAITING → FOCUSING → ASSEMBLING → COMPLETED */
 export const SESSION_STATUSES = [
@@ -88,12 +88,12 @@ export class Session {
   })
   defaultImageId: number | null;
 
-  @ManyToOne(() => DefaultImage, { nullable: true })
+  @ManyToOne(() => Image, { nullable: true })
   @JoinColumn({
     name: 'default_image_id',
     foreignKeyConstraintName: 'fk_session_default_image',
   })
-  defaultImage?: DefaultImage | null;
+  defaultImage?: Image | null;
 
   @Column({
     name: 'upload_image_key',
