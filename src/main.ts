@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule, ObserveInstrument } from './app.module.js';
+import { setupSwagger } from './common/swagger/swagger.setup.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -14,16 +14,7 @@ async function bootstrap() {
   });
   // 요청 검증·응답 형식·예외 처리는 CommonModule(src/common)이 전역으로 등록한다.
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Hackathon API')
-    .setVersion('0.0.1')
-    .addBearerAuth()
-    .build();
-  SwaggerModule.setup(
-    'docs',
-    app,
-    SwaggerModule.createDocument(app, swaggerConfig),
-  );
+  setupSwagger(app);
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
