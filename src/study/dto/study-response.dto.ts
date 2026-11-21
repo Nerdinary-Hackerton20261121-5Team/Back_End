@@ -43,8 +43,9 @@ export class HeartbeatResponseDto {
   remainingSeconds: number;
 
   @ApiProperty({
-    description: '다음 heartbeat까지 권장 간격(초)',
-    example: 10,
+    description:
+      '다음 heartbeat까지 권장 간격(초). 상태가 바뀌면 기다리지 말고 바로 보낸다',
+    example: 1,
   })
   heartbeatIntervalSeconds: number;
 

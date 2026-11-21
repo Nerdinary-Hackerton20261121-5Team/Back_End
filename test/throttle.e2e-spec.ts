@@ -112,4 +112,15 @@ describe('요청 횟수 제한 (e2e)', () => {
       await http().get('/api/health').set('CF-Connecting-IP', me).expect(200);
     }
   });
+
+  it('#84 heartbeat는 1초 주기라 요청 횟수 제한에서 뺀다', async () => {
+    const me = ip();
+    for (let i = 0; i < 6; i++) {
+      // 토큰이 없어 401이지만, 제한에 걸렸다면 429가 먼저 나온다
+      await http()
+        .post('/api/sessions/1/heartbeat')
+        .set('CF-Connecting-IP', me)
+        .expect(401);
+    }
+  });
 });

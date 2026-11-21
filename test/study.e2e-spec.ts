@@ -96,7 +96,7 @@ describe('heartbeat·진행판 API (e2e)', () => {
       status: 'FOCUSING',
       state: 'FOCUSING',
       disconnected: false,
-      heartbeatIntervalSeconds: 10,
+      heartbeatIntervalSeconds: 1,
     });
     const me = await participants().findOneByOrFail({ id: host.participantId });
     expect(Date.now() - me.lastHeartbeatAt!.getTime()).toBeLessThan(5 * SEC);
