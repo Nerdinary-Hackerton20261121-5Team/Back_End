@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { RawResponse } from '../common/response/raw-response.decorator.js';
 
@@ -17,11 +18,25 @@ export interface HealthResponse {
 @RawResponse()
 // 클러스터 probe가 주기적으로 부르므로 요청 횟수 제한에서 뺀다 (#67)
 @SkipThrottle()
+@ApiTags('health')
 @Controller('health')
 export class HealthController {
   constructor(private readonly config: ConfigService) {}
 
   @Get()
+  @ApiOperation({
+    summary: '서버 상태 확인',
+    description:
+      '서버가 떠 있는지와 배포된 커밋을 돌려준다. 공통 응답 형식으로 감싸지 않는다.',
+  })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        status: 'ok',
+        commit: '6bf4bc427b0f97e320051ea9a11d7172ce48f661',
+      },
+    },
+  })
   check(): HealthResponse {
     return {
       status: 'ok',

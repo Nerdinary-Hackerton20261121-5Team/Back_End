@@ -141,20 +141,72 @@ Back_End · Frontend · cluster-config 세 레포 README가 같은 표를 쓴다
 
 ### DB 외부 접속
 
-노트북의 MySQL 클라이언트(DBeaver·DataGrip·`mysql` CLI)로 DB에 붙는 방법은 두 가지다. 운영 DB는 사용자 `app` · 데이터베이스 `app`, dev DB는 사용자 `app_dev` · 데이터베이스 `app_dev`이고(아래 예시는 dev, 운영은 `app`으로 바꾼다), 비밀번호는 운영자에게 받는다. 비밀번호는 `.env` 같은 로컬 파일에만 두고 레포·이슈·PR·공개 채팅에 쓰지 않는다(이 주소는 인터넷에 열려 있고 보호막은 비밀번호뿐이다. 새어 나가면 바로 운영자에게 알린다). 백업이 없으니 `DROP`·대량 `DELETE` 전에 한 번 더 확인한다. 해커톤이 끝나면 닫힌다.
+DB 포트는 인터넷에 열려 있지 않다. 클러스터 밖에서는 운영자가 Tailscale 노드를 공유한 사람만, Tailscale 앱을 켠 상태(tailnet 안)에서 접속할 수 있다. 인터넷 공개 경로(cloudflared)는 2026-11-22 에 없앴다. 운영 DB는 사용자 `app` · 데이터베이스 `app`, dev DB는 사용자 `app_dev` · 데이터베이스 `app_dev`이고 접속 주소와 비밀번호는 운영자에게 받는다. 비밀번호는 `.env` 같은 로컬 파일에만 두고 레포·이슈·PR·공개 채팅에 쓰지 않는다. 백업이 없으니 `DROP`·대량 `DELETE` 전에 한 번 더 확인한다.
 
-1. **cloudflared** (누구나, 비밀번호만 있으면 된다). 설치는 macOS `brew install cloudflared`, Windows `winget install --id Cloudflare.cloudflared`. 터미널 하나를 켜 둔 채로 쓴다.
+## ERD
 
-   ```sh
-   cloudflared access tcp --hostname cmc-11th-db.bemelon.me --url 127.0.0.1:13306
-   mysql -h 127.0.0.1 -P 13306 -u app_dev -p app_dev    # 다른 터미널에서
-   ```
+테이블은 4개다. 로그인이 없어 사용자 테이블은 없고, 참가자는 방에 들어올 때 받은 토큰(해시로 저장)으로 구분한다. 스키마는 `src/database/migrations` 의 마이그레이션으로만 바뀐다.
 
-2. **Tailscale** (운영자가 `bemelon` 노드를 공유한 사람만). Tailscale 앱을 켠 상태(tailnet 안)에서만 열리고 cloudflared 없이 바로 접속한다. 이름이 안 풀리면 호스트에 `100.105.208.85`를 쓴다.
+```mermaid
+erDiagram
+    images ||--o{ session : "퍼즐 사진"
+    session ||--o{ participant : "참가"
+    session ||--o{ source_piece : "조각"
+    participant ||--o{ source_piece : "맡은 조각 2개"
 
-   ```sh
-   mysql -h bemelon.tailc71c61.ts.net -P 30306 -u app_dev -p app_dev
-   ```
+    images {
+        bigint image_id PK
+        varchar source "UPLOAD 또는 DEFAULT"
+        varchar name
+        varchar image_url "기본 이미지 주소"
+        varchar image_key UK "업로드한 파일 키"
+        datetime created_at
+    }
+    session {
+        bigint session_id PK
+        varchar session_code UK "초대 코드"
+        varchar create_request_id UK "방 만들기 요청 ID"
+        int max_participants "정원 4~6"
+        int goal_seconds "목표 시간(초)"
+        int split_count
+        boolean allow_random
+        bigint image_id FK
+        int grid_rows "조각 격자 행 = 인원"
+        int grid_cols "조각 격자 열 = 2"
+        varchar status "WAITING, FOCUSING, ASSEMBLING, COMPLETED"
+        datetime started_at
+        datetime ends_at
+        datetime assembly_started_at
+        datetime completed_at
+        bigint version
+        datetime created_at
+    }
+    participant {
+        bigint participant_id PK
+        bigint session_id FK
+        char token_hash UK "참가 토큰 해시"
+        varchar join_request_id "입장 요청 ID, 세션 안에서 유일"
+        boolean is_creator "방장 여부"
+        varchar nickname
+        datetime last_heartbeat_at
+        int focused_ms "누적 집중 시간"
+        varchar presence "FOCUSING, PAUSED, AWAY"
+        datetime disconnected_at
+        decimal final_restoration "최종 복원도 0~1"
+        datetime joined_at
+    }
+    source_piece {
+        bigint piece_id PK
+        bigint session_id FK
+        bigint participant_id FK
+        int position "정답 칸, 세션 안에서 유일"
+        int display_slot "공부 중 보여 줄 칸, 세션 안에서 유일"
+        datetime placed_at "정답 칸에 놓은 시각"
+        boolean auto_placed "부재자 조각 자동 배치"
+    }
+```
+
+방(`session`)을 지우면 참가자와 조각이 함께 지워진다(`ON DELETE CASCADE`).
 
 ## 배포 상세 (Back_End)
 
