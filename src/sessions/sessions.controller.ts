@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   HttpStatus,
   Param,
   ParseIntPipe,
@@ -24,13 +25,40 @@ import {
   SessionDetailResponseDto,
   SessionEntryResponseDto,
 } from './dto/session-response.dto.js';
+import { StartSessionResponseDto } from './dto/start-session-response.dto.js';
+import { SessionStartService } from './session-start.service.js';
 import { SessionErrors } from './sessions.errors.js';
 import { SessionsService } from './sessions.service.js';
 
 @ApiTags('sessions')
 @Controller('sessions')
 export class SessionsController {
-  constructor(private readonly sessions: SessionsService) {}
+  constructor(
+    private readonly sessions: SessionsService,
+    private readonly starter: SessionStartService,
+  ) {}
+
+  @Post(':sessionId/start')
+  @HttpCode(HttpStatus.OK)
+  @ParticipantAuth()
+  @ApiOperation({
+    summary: '세션 시작 (개설자)',
+    description:
+      '지금 입장한 인원으로 명단을 고정하고 시작·종료 시각을 확정한다. 인원수만큼 원조각(한 행에 2명)과 조립 조각(원조각당 4개)을 만든다. ' +
+      '이미 시작된 세션에 다시 보내면 처음 시작한 결과를 그대로 돌려준다. 시작 후에는 새로 입장할 수 없다.',
+  })
+  @ApiSuccessResponse(StartSessionResponseDto)
+  @ApiErrorResponses(
+    CommonErrors.INVALID_INPUT,
+    SessionErrors.NOT_CREATOR,
+    SessionErrors.SESSION_NOT_FOUND,
+  )
+  start(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @CurrentParticipant() me: RequestParticipant,
+  ): Promise<StartSessionResponseDto> {
+    return this.starter.start(sessionId, me);
+  }
 
   @Post()
   @ApiOperation({
