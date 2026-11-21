@@ -20,6 +20,8 @@ concurrency:
 
 jobs:
   build:
+    # workflow_dispatch는 브랜치를 고를 수 있으므로, main이 아닌 ref는 배포하지 않는다.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -55,6 +57,7 @@ jobs:
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
     uses: Nerdinary-Hackerton20261121-5Team/cluster-config/.github/workflows/deploy-image.yml@main

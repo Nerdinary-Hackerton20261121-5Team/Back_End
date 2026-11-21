@@ -103,7 +103,8 @@ main 머지 ─▶ GitHub Actions (.github/workflows/deploy.yml)
 ```
 
 머지부터 반영까지 보통 1~3분 걸립니다. Actions 탭의 `Deploy` 실행이 초록이면 cluster-config에 커밋된 것이고,
-이후 Argo CD가 반영하는 시간이 더해집니다. 수동으로 다시 돌리려면 Actions → `Deploy` → Run workflow.
+이후 Argo CD가 반영하는 시간이 더해집니다. 수동으로 다시 돌리려면 Actions → `Deploy` → Run workflow에서 **`main` 브랜치만** 고르세요.
+다른 브랜치를 고르면 build·deploy job이 건너뛰어져 아무것도 배포되지 않습니다.
 
 - PR에서는 `CI`(lint·build·test)만 돌고 배포는 일어나지 않습니다.
 - 홈서버가 amd64라 이미지는 항상 `linux/amd64`로 빌드합니다. Apple Silicon에서 직접 빌드한 이미지를 올리지 마세요.
