@@ -1,6 +1,8 @@
 @AGENTS.md
 @docs/Coding/NESTJS.md
 
+브랜치·PR·배포·비밀값 규칙은 AGENTS.md 9절을 따른다. 기능 브랜치 → PR(base `main`) 순서이고 `main` 머지가 곧 운영 배포다.
+
 # 프로젝트 초기 구조 (백엔드)
 
 팀원 누구나 AI 에이전트로 작업을 시작할 때 이 구조를 기준으로 삼는다.
@@ -16,6 +18,9 @@
 | `src/main.ts` | 앱 생성·전역 설정·Swagger·listen | O |
 | `src/app.module.ts` | 루트 모듈. Config(전역)·Observe 등록, 기능 모듈을 여기서 import | O |
 | `src/app.controller.ts`, `src/app.service.ts` | 샘플. 실제 기능은 `src/<기능>/` 모듈로 추가 | O |
+| `src/health/` | `GET /api/health` → 200 `{status, commit}`. 클러스터 probe가 쓰므로 경로·200 응답을 유지 | O |
+| `Dockerfile`, `.dockerignore` | 운영 이미지(포트 3000, `GIT_SHA` build-arg) | O |
+| `.github/workflows/` | `ci.yml` PR 검증, `deploy.yml` main 머지 시 registry.bemelon.me/cmc-11th push → cluster-config 태그 갱신 → Argo CD 배포 | O |
 | `src/**/*.spec.ts` | 단위 테스트(코드 옆에 둠) | O |
 | `test/` | e2e 테스트 (`vitest.config.e2e.ts`) | O |
 | `docs/Coding/NESTJS.md` | NestJS 기술 지침 | O |
