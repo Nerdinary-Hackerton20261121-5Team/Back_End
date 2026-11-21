@@ -136,6 +136,7 @@ export class SessionsService {
           sessionId: session.id,
           tokenHash,
           joinRequestId: dto.clientRequestId,
+          nickname: dto.nickname ?? null,
           isCreator: false,
           joinedAt: new Date(),
         }),
@@ -154,9 +155,13 @@ export class SessionsService {
       relations: { image: true },
     });
     if (!session) throw new BusinessException(SessionErrors.SESSION_NOT_FOUND);
-    const participantCount = await this.participants.count({
+    // 명단 (입장 순서). 진행판·조립판의 participantId로 닉네임을 찾는다 (#71)
+    const members = await this.participants.find({
       where: { sessionId },
+      order: { joinedAt: 'ASC', id: 'ASC' },
+      select: { id: true, nickname: true, isCreator: true },
     });
+    const participantCount = members.length;
 
     const now = new Date();
     const timer = {
@@ -181,7 +186,28 @@ export class SessionsService {
       serverNow: now,
       image: session.image ? this.images.toDto(session.image) : null,
       me: { participantId: me.participantId, isCreator: me.isCreator },
+      participants: members.map((m) => ({
+        participantId: m.id,
+        nickname: m.nickname,
+        isCreator: m.isCreator,
+      })),
     };
+  }
+
+  /** 닉네임 설정 (F-002, #71). 링크를 열 때 입장하고 "참여하기"에서 이름을 정하므로 입장과 따로 받는다. */
+  async updateNickname(
+    sessionId: number,
+    me: RequestParticipant,
+    nickname: string,
+  ): Promise<{ participantId: number; nickname: string }> {
+    const result = await this.participants.update(
+      { id: me.participantId, sessionId },
+      { nickname },
+    );
+    if (!result.affected) {
+      throw new BusinessException(SessionErrors.SESSION_NOT_FOUND);
+    }
+    return { participantId: me.participantId, nickname };
   }
 
   /**
@@ -331,6 +357,7 @@ export class SessionsService {
         sessionId: session.id,
         tokenHash,
         joinRequestId: dto.clientRequestId,
+        nickname: dto.nickname ?? null,
         isCreator: true,
         joinedAt: new Date(),
       }),
