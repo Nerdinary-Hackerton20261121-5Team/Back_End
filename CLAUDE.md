@@ -27,7 +27,7 @@
 | `AGENTS.md` | 팀 공통 에이전트 규칙 (개인 역할로 덮어쓰지 않음) | O |
 | `CLAUDE.md` | Claude Code 진입 파일 (위 두 문서 import + 이 구조 안내) | O |
 | `.claude/skills/`, `.agents/skills/` | NestJS 공식 스킬(`@nestjs/skills`). 두 폴더 내용 동일, 각각 Claude Code·기타 에이전트용 | O |
-| `.env.example` | 환경변수 예시 (`PORT`, `CORS_ORIGIN`, `DB_*`, `S3_*`, `IMGPROXY_*`) | O |
+| `.env.example` | 환경변수 예시 (`PORT`, `CORS_ORIGIN`, `DB_*`, `S3_*`, `IMGPROXY_*`, 정책 값 `POLICY_*`) | O |
 | `.env` | 실제 환경변수·비밀값 | X |
 | `.local/` | 개인 역할 설정(`role.yaml`) | X |
 | `dist/`, `node_modules/`, `*.tsbuildinfo` | 빌드·의존성 산출물 | X |
