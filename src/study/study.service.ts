@@ -70,10 +70,14 @@ export class StudyService {
         disconnectedAt = await this.freeze(participant.id, frozenAt);
       } else {
         // 고정되지 않은 참가자만 갱신한다. 고정값은 덮어쓰지 않는다 (AC-015, AC-019)
-        await this.participants.update(
+        const result = await this.participants.update(
           { id: participant.id, disconnectedAt: IsNull() },
           { lastHeartbeatAt: now },
         );
+        // 그사이 다른 요청이 고정했으면 고정된 값 기준으로 응답한다 (#52)
+        if (!result.affected) {
+          disconnectedAt = await this.currentDisconnectedAt(participant.id);
+        }
       }
     }
 
@@ -162,17 +166,35 @@ export class StudyService {
     };
   }
 
-  /** 아직 고정되지 않았을 때만 기록한다. 이미 고정됐으면 기존 값을 돌려준다. */
-  private async freeze(participantId: number, frozenAt: Date): Promise<Date> {
+  /**
+   * 끊김 고정. 고정 시각은 판정에 쓴 마지막 연결 확인 시각(frozenAt)이다.
+   * 아직 고정되지 않았고, 마지막 연결 확인 시각이 판정 때 읽은 값 그대로일 때만 기록한다.
+   * 그사이 heartbeat가 들어와 시각이 바뀌었으면 고정하지 않는다 (#52, AC-015·AC-016).
+   * 반환값은 실제 저장된 고정 시각(이미 고정돼 있었으면 그 값), 고정되지 않았으면 null.
+   */
+  private async freeze(
+    participantId: number,
+    frozenAt: Date,
+  ): Promise<Date | null> {
     const result = await this.participants.update(
-      { id: participantId, disconnectedAt: IsNull() },
+      {
+        id: participantId,
+        disconnectedAt: IsNull(),
+        lastHeartbeatAt: frozenAt,
+      },
       { disconnectedAt: frozenAt },
     );
     if (result.affected) return frozenAt;
+    return this.currentDisconnectedAt(participantId);
+  }
+
+  private async currentDisconnectedAt(
+    participantId: number,
+  ): Promise<Date | null> {
     const current = await this.participants.findOneByOrFail({
       id: participantId,
     });
-    return current.disconnectedAt ?? frozenAt;
+    return current.disconnectedAt;
   }
 
   private async findSession(sessionId: number): Promise<Session> {
