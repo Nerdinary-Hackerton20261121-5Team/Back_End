@@ -119,7 +119,7 @@ export class PieceImageService {
     return { body: await body, blurLevel: level };
   }
 
-  /** 조각 주인의 복원도. 진행판과 같은 판정을 쓴다 (최종값 우선, 없으면 끊김 판정 후 계산, #76) */
+  /** 조각 주인의 복원도. 진행판과 같은 계산(누적 집중 시간 기준, 확정값 우선, #76) */
   private async ownerRestoration(
     session: Session,
     participantId: number,

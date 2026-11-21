@@ -31,10 +31,11 @@ const DESCRIPTION = `
 3. \`POST /api/sessions/join\` 3번 — 같은 \`sessionCode\`, \`clientRequestId\`는 매번 다르게 (최소 4명이어야 시작)
 4. (선택) \`PATCH /api/sessions/{sessionId}/participants/me\` 닉네임, \`POST /api/images\` → \`PATCH /api/sessions/{sessionId}/image\` 방 사진
 5. \`POST /api/sessions/{sessionId}/start\` 시작 (방장)
-6. \`POST /api/sessions/{sessionId}/heartbeat\`, \`GET /api/sessions/{sessionId}/board\` 공부 중 연결 확인·진행판
+6. \`POST /api/sessions/{sessionId}/heartbeat\` (\`state\`: FOCUSING·PAUSED·AWAY, 얼굴이 보일 때 FOCUSING), \`GET /api/sessions/{sessionId}/board\` 공부 중 연결 확인·진행판
 7. 60초를 기다리거나 \`POST /api/sessions/{sessionId}/end\` 조기 종료 (방장)
 8. \`GET /api/sessions/{sessionId}/assembly\` 조립판 → \`PATCH /api/sessions/{sessionId}/assembly/pieces/{pieceId}\` 조각 놓기 (자기 조각만, 정답 칸이면 \`correct: true\`)
-9. \`DELETE /api/sessions/{sessionId}\` 방 삭제 (방장) — 이후 이 방 토큰은 401
+9. \`GET /api/sessions/{sessionId}/result\` 공부 결과 (공부 시간 종료 후)
+10. \`DELETE /api/sessions/{sessionId}\` 방 삭제 (방장) — 이후 이 방 토큰은 401
 
 **시작 전 나가기**: \`DELETE /api/sessions/{sessionId}/participants/me\` (방장이 나가면 다음 입장자가 방장)
 **요청 횟수 제한**: 사용자 IP별 1분에 방 만들기 20회·입장 60회, 넘으면 429 \`TOO_MANY_REQUESTS\`
