@@ -28,6 +28,19 @@ export function sessionPhase(timer: SessionTimer, now: Date): SessionPhase {
     : 'ASSEMBLING';
 }
 
+/**
+ * 응답에 내보낼 세션 단계. 팀 통과(COMPLETED)는 조립 결과로 DB에 저장된 값을 그대로 쓰고,
+ * 나머지는 서버 시각으로 계산한다 (DB의 FOCUSING은 종료 시각이 지나도 조립을 열기 전까지 그대로라서).
+ */
+export function sessionStatus(
+  session: SessionTimer & { status: string },
+  now: Date,
+): SessionPhase | 'COMPLETED' {
+  return session.status === 'COMPLETED'
+    ? 'COMPLETED'
+    : sessionPhase(session, now);
+}
+
 /** 시작 시각 기준 종료 예정 시각 = startedAt + goalSeconds (AC-008: 이탈·화면 전환과 무관) */
 export function endsAt(timer: SessionTimer): Date | null {
   return timer.startedAt

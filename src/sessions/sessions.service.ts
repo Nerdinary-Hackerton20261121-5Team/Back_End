@@ -19,7 +19,7 @@ import { ImagesService } from '../storage/images.service.js';
 import {
   elapsedSeconds,
   remainingSeconds,
-  sessionPhase,
+  sessionStatus,
 } from '../study/session-clock.js';
 import type { CreateSessionDto } from './dto/create-session.dto.js';
 import type { JoinSessionDto } from './dto/join-session.dto.js';
@@ -168,8 +168,7 @@ export class SessionsService {
       startedAt: session.startedAt,
       goalSeconds: session.goalSeconds,
     };
-    const status: SessionStatus =
-      session.status === 'COMPLETED' ? 'COMPLETED' : sessionPhase(timer, now);
+    const status: SessionStatus = sessionStatus(session, now);
 
     return {
       sessionId: session.id,

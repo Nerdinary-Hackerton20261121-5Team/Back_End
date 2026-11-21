@@ -3,6 +3,7 @@ import type { Repository } from 'typeorm';
 import type { SourcePiece } from '../puzzle/entities/source-piece.entity.js';
 import type { Participant } from '../sessions/entities/participant.entity.js';
 import type { Session } from '../sessions/entities/session.entity.js';
+import { PresenceService } from './presence.service.js';
 import { StudyService } from './study.service.js';
 
 /**
@@ -50,6 +51,9 @@ function setup(rows: Row[]) {
     findOneByOrFail: vi.fn(async ({ id }: { id: number }) => ({
       ...rows.find((r) => r.id === id)!,
     })),
+    findOneBy: vi.fn(async ({ id }: { id: number }) => ({
+      ...rows.find((r) => r.id === id)!,
+    })),
     find: vi.fn(async () => rows.map((r) => ({ ...r }))),
     update: vi.fn(async (where: Record<string, unknown>, set: Partial<Row>) => {
       let affected = 0;
@@ -66,6 +70,7 @@ function setup(rows: Row[]) {
     { findOneBy: vi.fn(async () => session) } as unknown as Repository<Session>,
     participants as unknown as Repository<Participant>,
     { find: vi.fn(async () => []) } as unknown as Repository<SourcePiece>,
+    new PresenceService(participants as unknown as Repository<Participant>),
   );
   return { service, participants };
 }

@@ -17,7 +17,7 @@ import { Session } from '../sessions/entities/session.entity.js';
 import { SessionErrors } from '../sessions/sessions.errors.js';
 import type { Image } from '../storage/entities/image.entity.js';
 import { IMAGES_DISK } from '../storage/storage.config.js';
-import { restoration } from './session-clock.js';
+import { PresenceService } from './presence.service.js';
 import { StudyErrors } from './study.errors.js';
 
 export interface PieceImage {
@@ -70,6 +70,7 @@ export class PieceImageService {
     @InjectRepository(SourcePiece)
     private readonly sourcePieces: Repository<SourcePiece>,
     @InjectDisk(IMAGES_DISK) private readonly disk: StorageDisk,
+    private readonly presence: PresenceService,
   ) {}
 
   async render(
@@ -118,17 +119,16 @@ export class PieceImageService {
     return { body: await body, blurLevel: level };
   }
 
-  /** 조각 주인의 복원도. 조립 단계에서 확정된 값이 있으면 그 값, 아니면 지금 시각 기준 */
+  /** 조각 주인의 복원도. 진행판과 같은 판정을 쓴다 (최종값 우선, 없으면 끊김 판정 후 계산, #76) */
   private async ownerRestoration(
     session: Session,
     participantId: number,
   ): Promise<number> {
     const owner = await this.participants.findOneBy({ id: participantId });
     if (!owner) return 0;
-    if (owner.finalRestoration !== null) return owner.finalRestoration;
-    return restoration(
+    return this.presence.restorationOf(
+      owner,
       { startedAt: session.startedAt, goalSeconds: session.goalSeconds },
-      owner.disconnectedAt,
       new Date(),
     );
   }
