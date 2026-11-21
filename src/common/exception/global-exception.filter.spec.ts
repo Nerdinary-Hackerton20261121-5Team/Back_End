@@ -61,15 +61,18 @@ describe('GlobalExceptionFilter', () => {
     const { host, res } = mockHost();
 
     filter.catch(
-      new BusinessException(CommonErrors.CONFLICT, '이미 시작된 세션입니다.'),
+      new BusinessException(
+        CommonErrors.INVALID_INPUT,
+        '목표 시간은 0보다 커야 합니다.',
+      ),
       host,
     );
 
-    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        code: 'CONFLICT',
-        message: '이미 시작된 세션입니다.',
+        code: 'INVALID_INPUT',
+        message: '목표 시간은 0보다 커야 합니다.',
       }),
     );
   });
@@ -122,15 +125,18 @@ describe('GlobalExceptionFilter', () => {
     );
   });
 
-  it('가드의 403은 FORBIDDEN', () => {
+  it('공통 코드에 없는 4xx(예: 가드의 403)도 같은 형식으로 응답한다', () => {
     const { host, res } = mockHost();
 
-    filter.catch(new ForbiddenException(), host);
+    filter.catch(new ForbiddenException('개설자만 할 수 있습니다.'), host);
 
     expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 'FORBIDDEN' }),
-    );
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      code: 'HTTP_403',
+      message: '개설자만 할 수 있습니다.',
+      data: null,
+    });
   });
 
   it('공통 코드에 없는 4xx는 HTTP_<상태>로 응답한다', () => {

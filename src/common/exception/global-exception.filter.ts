@@ -69,7 +69,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (known) {
       return known;
     }
-    // 공통 코드에 없는 4xx (예: 410, 422)
+    // 공통 코드에 없는 4xx (401, 403, 409 등): 던진 쪽의 메시지를 그대로 쓴다
     return { code: `HTTP_${status}`, status, message: exception.message };
   }
 
