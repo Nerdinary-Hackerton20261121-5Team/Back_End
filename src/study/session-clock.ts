@@ -9,14 +9,21 @@ export type SessionPhase = 'WAITING' | 'FOCUSING' | 'ASSEMBLING';
 export interface SessionTimer {
   /** 개설자가 시작한 시각. 시작 전이면 null */
   startedAt: Date | null;
-  /** 공통 목표 시간(초), 0보다 크다 */
+  /** 공통 목표 시간(초), 0보다 크다. 복원도의 분모 */
   goalSeconds: number;
+  /**
+   * 저장된 종료 시각. 방장이 조기 종료하면 startedAt + goalSeconds보다 앞당겨진다 (#78).
+   * 없으면 startedAt + goalSeconds로 계산한다.
+   */
+  endsAt?: Date | null;
 }
 
 const MS = 1000;
 
 function endsAtOf(timer: SessionTimer & { startedAt: Date }): Date {
-  return new Date(timer.startedAt.getTime() + timer.goalSeconds * MS);
+  return (
+    timer.endsAt ?? new Date(timer.startedAt.getTime() + timer.goalSeconds * MS)
+  );
 }
 
 /** 시작 전 WAITING, 집중 중 FOCUSING, 종료 시각이 지나면 ASSEMBLING (조회 시점에 계산, 스케줄러 불필요) */
@@ -59,9 +66,18 @@ export function elapsedSeconds(timer: SessionTimer, now: Date): number {
   return Math.min(Math.max(elapsed, 0), timer.goalSeconds);
 }
 
-/** 남은 시간(초). 음수가 되지 않는다 (AC-014) */
+/** 남은 시간(초). 음수가 되지 않는다 (AC-014). 조기 종료했으면 0 (#78) */
 export function remainingSeconds(timer: SessionTimer, now: Date): number {
-  return timer.goalSeconds - elapsedSeconds(timer, now);
+  if (!timer.startedAt) return timer.goalSeconds;
+  const total = Math.floor(
+    (endsAtOf({ ...timer, startedAt: timer.startedAt }).getTime() -
+      timer.startedAt.getTime()) /
+      MS,
+  );
+  return Math.max(
+    Math.min(total, timer.goalSeconds) - elapsedSeconds(timer, now),
+    0,
+  );
 }
 
 /**

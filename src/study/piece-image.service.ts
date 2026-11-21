@@ -128,7 +128,11 @@ export class PieceImageService {
     if (!owner) return 0;
     return this.presence.restorationOf(
       owner,
-      { startedAt: session.startedAt, goalSeconds: session.goalSeconds },
+      {
+        startedAt: session.startedAt,
+        goalSeconds: session.goalSeconds,
+        endsAt: session.endsAt,
+      },
       new Date(),
     );
   }

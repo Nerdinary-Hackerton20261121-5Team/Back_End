@@ -153,7 +153,11 @@ export class StudyService {
   }
 
   private timer(session: Session): SessionTimer {
-    return { startedAt: session.startedAt, goalSeconds: session.goalSeconds };
+    return {
+      startedAt: session.startedAt,
+      goalSeconds: session.goalSeconds,
+      endsAt: session.endsAt,
+    };
   }
 
   private status(session: Session, now: Date): SessionStatus {

@@ -30,6 +30,7 @@ import type {
 import { Participant } from './entities/participant.entity.js';
 import { Session, type SessionStatus } from './entities/session.entity.js';
 import type { LeaveSessionResponseDto } from './dto/leave-session-response.dto.js';
+import type { EndFocusResponseDto } from './dto/end-focus-response.dto.js';
 import { generateInviteCode } from './invite-code.js';
 import { SessionErrors } from './sessions.errors.js';
 
@@ -167,6 +168,7 @@ export class SessionsService {
     const timer = {
       startedAt: session.startedAt,
       goalSeconds: session.goalSeconds,
+      endsAt: session.endsAt,
     };
     const status: SessionStatus = sessionStatus(session, now);
 
@@ -191,6 +193,48 @@ export class SessionsService {
         isCreator: m.isCreator,
       })),
     };
+  }
+
+  /**
+   * 방장 조기 종료 (#78, Q-003 조기 종료 권한, Figma 07 "종료").
+   * 종료 시각(ends_at)을 지금으로 당겨 모두의 공부를 끝낸다. 조회하면 바로 ASSEMBLING이고,
+   * 첫 조립 요청에서 기존 흐름대로 최종 복원도 확정·부재자 조각 배치를 한다.
+   * 복원도는 원래 목표 시간 기준이다 (50분 목표에서 20분에 끝내면 40%).
+   * 세션 행을 잠가 조립 열기·다른 종료 요청과 한 줄로 세운다. 이미 끝났으면 그 시각을 그대로 돌려준다.
+   */
+  async endFocus(
+    sessionId: number,
+    me: RequestParticipant,
+  ): Promise<EndFocusResponseDto> {
+    if (!me.isCreator) {
+      throw new BusinessException(SessionErrors.NOT_CREATOR);
+    }
+    return this.dataSource.transaction(async (manager) => {
+      const session = await manager.findOne(Session, {
+        where: { id: sessionId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!session) {
+        throw new BusinessException(SessionErrors.SESSION_NOT_FOUND);
+      }
+      if (!session.startedAt || !session.endsAt) {
+        throw new BusinessException(SessionErrors.FOCUS_NOT_STARTED);
+      }
+      const now = new Date();
+      const alreadyEnded =
+        session.status !== 'FOCUSING' || session.endsAt <= now;
+      if (!alreadyEnded) {
+        await manager.update(Session, { id: sessionId }, { endsAt: now });
+        session.endsAt = now;
+      }
+      return {
+        sessionId,
+        status: sessionStatus(session, now),
+        endsAt: session.endsAt,
+        alreadyEnded,
+        serverNow: now,
+      };
+    });
   }
 
   /** 닉네임 설정 (F-002, #71). 링크를 열 때 입장하고 "참여하기"에서 이름을 정하므로 입장과 따로 받는다. */
