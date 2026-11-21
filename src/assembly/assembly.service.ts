@@ -6,10 +6,6 @@ import { BusinessException } from '../common/exception/business.exception.js';
 import { CommonErrors } from '../common/exception/error-code.js';
 import { heartbeatPolicy } from '../config/policy.js';
 import { SourcePiece } from '../puzzle/entities/source-piece.entity.js';
-import {
-  buildPuzzleLayout,
-  type AssemblyPieceLayout,
-} from '../puzzle/puzzle-splitter.js';
 import { Participant } from '../sessions/entities/participant.entity.js';
 import { Session } from '../sessions/entities/session.entity.js';
 import { SessionErrors } from '../sessions/sessions.errors.js';
@@ -20,15 +16,12 @@ import type {
   AssemblySlotDto,
   PlacePieceResponseDto,
 } from './dto/assembly.dto.js';
-import { AssemblyPiece } from './entities/assembly-piece.entity.js';
-
-/** 원조각 하나를 2×2로 나누므로 조립판은 4열, 행은 원조각 행의 2배 */
-const BOARD_COLS = 4;
 
 /**
- * 공동 조립 (F-006).
+ * 공동 조립 (F-006). 조립판은 조각 격자(session.grid_rows × grid_cols)와 같고,
+ * 놓는 단위는 공부 중에 쓴 조각(source_piece) 그대로다. 놓인 상태는 source_piece.placed_at에 둔다.
  * - 집중 종료 후 첫 조립 요청에서 한 번만: ASSEMBLING 전환, 최종 복원도 확정, 부재자 조각 자동 배치
- * - 조각 놓기: 자기 원조각에서 나온 조각만, 정답 칸이면 저장, 아니면 저장하지 않음(직전 위치로 복귀)
+ * - 조각 놓기: 자기 조각만, 정답 칸이면 저장, 아니면 저장하지 않음(직전 위치로 복귀)
  * - 모든 조각이 정답 칸이면 COMPLETED (팀 통과). 복원도는 판정에 쓰지 않는다
  */
 @Injectable()
@@ -46,20 +39,15 @@ export class AssemblyService {
     const session = await this.findSession(manager, sessionId);
     this.assertOpen(session);
 
-    const [sources, pieces, participants] = await Promise.all([
-      manager.find(SourcePiece, { where: { sessionId } }),
-      manager.find(AssemblyPiece, {
+    const [pieces, participants] = await Promise.all([
+      manager.find(SourcePiece, {
         where: { sessionId },
         order: { id: 'ASC' },
       }),
       manager.find(Participant, { where: { sessionId } }),
     ]);
-    const boardRows = (session.gridRows ?? 0) * 2;
-    // 시작 API가 조립 조각을 더 만들지 않으므로 조각이 없는 판이면 칸도 비운다
-    const slotOf = pieces.length
-      ? this.slotGeometry(buildPuzzleLayout(sources.length).pieces, boardRows)
-      : new Map<number, AssemblySlotDto>();
-    const ownerOf = new Map(sources.map((s) => [s.id, s.participantId]));
+    const boardRows = session.gridRows ?? 0;
+    const boardCols = session.gridCols ?? 0;
     const finalOf = new Map(
       participants.map((p) => [p.id, p.finalRestoration ?? 0]),
     );
@@ -68,24 +56,21 @@ export class AssemblyService {
     return {
       status: session.status,
       boardRows,
-      boardCols: BOARD_COLS,
+      boardCols,
       totalPieces: pieces.length,
       placedCount,
       completed: session.status === 'COMPLETED',
-      slots: [...slotOf.values()],
-      pieces: pieces.map((piece) => {
-        const owner = ownerOf.get(piece.sourcePieceId);
-        return {
-          pieceId: piece.id,
-          isMine: owner === me.participantId,
-          colSpan: slotOf.get(piece.position)?.colSpan ?? 1,
-          restoration: owner === undefined ? 0 : (finalOf.get(owner) ?? 0),
-          placed: piece.placedAt !== null,
-          // 정답 위치는 놓이기 전까지 알려주지 않는다
-          position: piece.placedAt ? piece.position : null,
-          autoPlaced: piece.autoPlaced,
-        };
-      }),
+      slots: this.slots(pieces.length, boardCols),
+      pieces: pieces.map((piece) => ({
+        pieceId: piece.id,
+        isMine: piece.participantId === me.participantId,
+        colSpan: 1,
+        restoration: finalOf.get(piece.participantId) ?? 0,
+        placed: piece.placedAt !== null,
+        // 정답 위치는 놓이기 전까지 알려주지 않는다
+        position: piece.placedAt ? piece.position : null,
+        autoPlaced: piece.autoPlaced,
+      })),
       serverNow: now,
     };
   }
@@ -104,18 +89,15 @@ export class AssemblyService {
       const session = await this.findSession(manager, sessionId, true);
       this.assertOpen(session);
 
-      const piece = await manager.findOne(AssemblyPiece, {
+      const piece = await manager.findOne(SourcePiece, {
         where: { id: pieceId, sessionId },
       });
       if (!piece) throw new BusinessException(AssemblyErrors.PIECE_NOT_FOUND);
-      const source = await manager.findOneByOrFail(SourcePiece, {
-        id: piece.sourcePieceId,
-      });
-      if (source.participantId !== me.participantId) {
+      if (piece.participantId !== me.participantId) {
         throw new BusinessException(AssemblyErrors.NOT_PIECE_OWNER);
       }
 
-      const totalPieces = await manager.count(AssemblyPiece, {
+      const totalPieces = await manager.count(SourcePiece, {
         where: { sessionId },
       });
       if (targetPosition > totalPieces) {
@@ -131,14 +113,14 @@ export class AssemblyService {
 
       if (correct && !placed) {
         await manager.update(
-          AssemblyPiece,
+          SourcePiece,
           { id: piece.id, placedAt: IsNull() },
           { placedAt: now },
         );
         placed = true;
       } else if (!correct) {
         // 틀린 칸·이미 찬 칸은 저장하지 않는다 (클라이언트가 직전 위치로 되돌림)
-        const occupied = await manager.exists(AssemblyPiece, {
+        const occupied = await manager.exists(SourcePiece, {
           where: {
             sessionId,
             position: targetPosition,
@@ -149,7 +131,7 @@ export class AssemblyService {
         correct = false;
       }
 
-      const placedCount = await manager.count(AssemblyPiece, {
+      const placedCount = await manager.count(SourcePiece, {
         where: { sessionId, placedAt: Not(IsNull()) },
       });
       let completed = session.status === 'COMPLETED';
@@ -223,24 +205,14 @@ export class AssemblyService {
       }
 
       if (absent.length) {
-        const sources = await manager.find(SourcePiece, {
-          where: { sessionId, participantId: In(absent) },
-          select: { id: true },
-        });
-        if (sources.length) {
-          await manager.update(
-            AssemblyPiece,
-            {
-              sessionId,
-              sourcePieceId: In(sources.map((s) => s.id)),
-              placedAt: IsNull(),
-            },
-            { placedAt: now, autoPlaced: true },
-          );
-        }
+        await manager.update(
+          SourcePiece,
+          { sessionId, participantId: In(absent), placedAt: IsNull() },
+          { placedAt: now, autoPlaced: true },
+        );
       }
 
-      const remaining = await manager.count(AssemblyPiece, {
+      const remaining = await manager.count(SourcePiece, {
         where: { sessionId, placedAt: IsNull() },
       });
       await manager.update(
@@ -257,22 +229,15 @@ export class AssemblyService {
     });
   }
 
-  /** 조립판 칸 위치. 정규화 좌표를 4열 × (원조각 행 × 2) 격자로 바꾼다 */
-  private slotGeometry(
-    pieces: AssemblyPieceLayout[],
-    boardRows: number,
-  ): Map<number, AssemblySlotDto> {
-    return new Map(
-      pieces.map((p) => [
-        p.position,
-        {
-          position: p.position,
-          row: Math.round(p.rect.y * boardRows),
-          col: Math.round(p.rect.x * BOARD_COLS),
-          colSpan: Math.round(p.rect.w * BOARD_COLS),
-        },
-      ]),
-    );
+  /** 조립판 칸 위치. 칸 번호는 왼쪽 위부터 1, 한 행에 boardCols칸 */
+  private slots(total: number, boardCols: number): AssemblySlotDto[] {
+    if (!boardCols) return [];
+    return Array.from({ length: total }, (_, i) => ({
+      position: i + 1,
+      row: Math.floor(i / boardCols),
+      col: i % boardCols,
+      colSpan: 1,
+    }));
   }
 
   private async findSession(

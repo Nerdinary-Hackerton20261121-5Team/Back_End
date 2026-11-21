@@ -22,12 +22,11 @@ export class AssemblySlotDto {
   @ApiProperty({ description: '행 (0부터)', example: 0 })
   row: number;
 
-  @ApiProperty({ description: '열 (0부터, 0~3)', example: 0 })
+  @ApiProperty({ description: '열 (0부터, 0~1)', example: 0 })
   col: number;
 
   @ApiProperty({
-    description: '차지하는 열 수. 5명일 때 맨 아래 두 행의 칸만 2',
-    enum: [1, 2],
+    description: '차지하는 열 수. 지금은 항상 1',
     example: 1,
   })
   colSpan: number;
@@ -35,7 +34,7 @@ export class AssemblySlotDto {
 
 export class AssemblyPieceDto {
   @ApiProperty({
-    description: '조립 조각 ID (조각 놓기 요청에 사용)',
+    description: '조각 ID (= 공부 화면의 조각 ID, 조각 놓기 요청에 사용)',
     example: 11,
   })
   pieceId: number;
@@ -43,7 +42,7 @@ export class AssemblyPieceDto {
   @ApiProperty({ description: '내가 옮길 수 있는 조각인지', example: true })
   isMine: boolean;
 
-  @ApiProperty({ description: '조각 너비(열 수)', enum: [1, 2], example: 1 })
+  @ApiProperty({ description: '조각 너비(열 수). 지금은 항상 1', example: 1 })
   colSpan: number;
 
   @ApiProperty({
@@ -76,13 +75,16 @@ export class AssemblyBoardResponseDto {
   @ApiProperty({ enum: SESSION_STATUSES, example: 'ASSEMBLING' })
   status: SessionStatus;
 
-  @ApiProperty({ description: '조립판 행 수 = 원조각 행 수 × 2', example: 4 })
+  @ApiProperty({
+    description: '조립판 행 수 = 조각 격자 행 수(참가자 수)',
+    example: 4,
+  })
   boardRows: number;
 
-  @ApiProperty({ description: '조립판 열 수', example: 4 })
+  @ApiProperty({ description: '조립판 열 수 = 조각 격자 열 수', example: 2 })
   boardCols: number;
 
-  @ApiProperty({ example: 16 })
+  @ApiProperty({ description: '조각 수 = 참가자 수 × 2', example: 8 })
   totalPieces: number;
 
   @ApiProperty({ example: 4 })
@@ -136,7 +138,7 @@ export class PlacePieceResponseDto {
   @ApiProperty({ example: 5 })
   placedCount: number;
 
-  @ApiProperty({ example: 16 })
+  @ApiProperty({ example: 8 })
   totalPieces: number;
 
   @ApiProperty({ description: '팀 통과 여부', example: false })
