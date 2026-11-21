@@ -2,9 +2,7 @@ import {
   elapsedSeconds,
   endsAt,
   isDisconnected,
-  nextFrozenAt,
   remainingSeconds,
-  restoration,
   sessionPhase,
   type SessionTimer,
 } from './session-clock.js';
@@ -65,48 +63,6 @@ describe('단절 판정', () => {
   it('시작 전에는 끊김을 판정하지 않는다', () => {
     expect(isDisconnected(notStarted, at(0), at(99 * MIN), TIMEOUT)).toBe(
       false,
-    );
-  });
-});
-
-describe('nextFrozenAt', () => {
-  it('끊기면 마지막 확인 시각으로 고정한다', () => {
-    const p = { lastHeartbeatAt: at(8 * MIN), frozenAt: null };
-    expect(nextFrozenAt(timer, p, at(10 * MIN), TIMEOUT)).toEqual(at(8 * MIN));
-  });
-
-  it('AC-015·AC-019 이미 고정됐으면 다시 고정하지 않는다 (덮어쓰기 없음)', () => {
-    const p = { lastHeartbeatAt: at(15 * MIN), frozenAt: at(8 * MIN) };
-    expect(nextFrozenAt(timer, p, at(19 * MIN), TIMEOUT)).toBeNull();
-  });
-
-  it('연결돼 있으면 고정하지 않는다', () => {
-    const p = { lastHeartbeatAt: at(9 * MIN + 50), frozenAt: null };
-    expect(nextFrozenAt(timer, p, at(10 * MIN), TIMEOUT)).toBeNull();
-  });
-});
-
-describe('restoration', () => {
-  it('목표 20분 중 8분에 끊긴 A는 0.4로 고정, 끝까지 연결된 B는 1.0 (AC-016)', () => {
-    const end = at(20 * MIN + 5 * MIN);
-    expect(restoration(timer, at(8 * MIN), end)).toBeCloseTo(0.4);
-    expect(restoration(timer, null, end)).toBe(1);
-  });
-
-  it('공부 중에는 경과 비율만큼 복원된다', () => {
-    expect(restoration(timer, null, at(5 * MIN))).toBeCloseTo(0.25);
-  });
-
-  it('시작 전 0, 범위는 항상 0~1 (AC-014)', () => {
-    expect(restoration(notStarted, null, at(5 * MIN))).toBe(0);
-    expect(restoration(timer, null, at(-10))).toBe(0);
-    expect(restoration(timer, null, at(999 * MIN))).toBe(1);
-  });
-
-  it('AC-040 같은 입력이면 항상 같은 값', () => {
-    const now = at(13 * MIN);
-    expect(restoration(timer, at(6 * MIN), now)).toBe(
-      restoration(timer, at(6 * MIN), now),
     );
   });
 });

@@ -3,19 +3,40 @@ import {
   SESSION_STATUSES,
   type SessionStatus,
 } from '../../sessions/entities/session.entity.js';
+import { MEMBER_STATES, type MemberState } from '../focus-time.js';
+
+const MEMBER_STATE_DESCRIPTION =
+  'FOCUSING = 기록 중(얼굴 인식), PAUSED = 일시정지, AWAY = 얼굴 인식 안 됨, ' +
+  'DISCONNECTED = heartbeat가 단절 기준 시간 넘게 끊김. FOCUSING일 때만 시간이 쌓인다';
 
 export class HeartbeatResponseDto {
   @ApiProperty({ enum: SESSION_STATUSES, example: 'FOCUSING' })
   status: SessionStatus;
 
   @ApiProperty({
+    enum: MEMBER_STATES,
+    description: `내 상태. ${MEMBER_STATE_DESCRIPTION}`,
+    example: 'FOCUSING',
+  })
+  state: MemberState;
+
+  @ApiProperty({
+    description: '내 누적 집중 시간(초). 얼굴이 인식된 시간의 합',
+    example: 1200,
+  })
+  focusedSeconds: number;
+
+  @ApiProperty({
     description:
-      '내 연결이 끊긴 것으로 확정됐는지. true면 복원도가 끊긴 시점에 고정되고 더 늘지 않는다 (AC-016)',
+      '내 연결이 끊긴 상태인지 (= state가 DISCONNECTED). 끊긴 동안은 시간이 쌓이지 않고, 다시 heartbeat를 보내면 이어서 쌓인다',
     example: false,
   })
   disconnected: boolean;
 
-  @ApiProperty({ description: '내 복원도 0~1', example: 0.25 })
+  @ApiProperty({
+    description: '내 복원도 0~1 = 누적 집중 시간 / 목표 시간',
+    example: 0.25,
+  })
   myRestoration: number;
 
   @ApiProperty({ description: '남은 시간(초)', example: 45 })
@@ -33,6 +54,33 @@ export class HeartbeatResponseDto {
     example: '2026-11-22T03:00:15.000Z',
   })
   serverNow: Date;
+}
+
+export class BoardMemberDto {
+  @ApiProperty({ example: 1 })
+  participantId: number;
+
+  @ApiProperty({ nullable: true, type: String, example: '졸린 도도' })
+  nickname: string | null;
+
+  @ApiProperty({ example: true })
+  isMe: boolean;
+
+  @ApiProperty({
+    enum: MEMBER_STATES,
+    description: MEMBER_STATE_DESCRIPTION,
+    example: 'FOCUSING',
+  })
+  state: MemberState;
+
+  @ApiProperty({
+    description: '누적 집중 시간(초). "기록 중 · n분째" 표시에 쓴다',
+    example: 1200,
+  })
+  focusedSeconds: number;
+
+  @ApiProperty({ description: '복원도 0~1', example: 0.64 })
+  restoration: number;
 }
 
 export class PieceEdgesDto {
@@ -97,12 +145,10 @@ export class BoardPieceDto {
 
   @ApiProperty({
     description:
-      '복원도 0~1. 집중 중에는 내 조각만 값이 있고 남의 조각은 null(블러로 표시). 조립 단계부터 모두 공개',
-    nullable: true,
-    type: Number,
+      '조각 주인의 복원도 0~1 (누적 집중 시간 / 목표 시간). 진행 링 표시용으로 모두 공개한다. 조각 이미지는 남의 것이면 블러',
     example: 0.25,
   })
-  restoration: number | null;
+  restoration: number;
 }
 
 export class BoardResponseDto {
@@ -135,10 +181,17 @@ export class BoardResponseDto {
   padRatio: number;
 
   @ApiProperty({
-    description: '내 연결이 끊겨 복원도가 고정됐는지',
+    description:
+      '내 연결이 끊긴 상태인지 (members에서 내 state가 DISCONNECTED)',
     example: false,
   })
   myDisconnected: boolean;
+
+  @ApiProperty({
+    type: [BoardMemberDto],
+    description: '함께 하는 사람 명단, 입장 순서',
+  })
+  members: BoardMemberDto[];
 
   @ApiProperty({
     type: [BoardPieceDto],
@@ -150,6 +203,69 @@ export class BoardResponseDto {
     type: String,
     format: 'date-time',
     example: '2026-11-22T03:00:15.000Z',
+  })
+  serverNow: Date;
+}
+
+export class ResultMemberDto {
+  @ApiProperty({ example: 1 })
+  participantId: number;
+
+  @ApiProperty({ nullable: true, type: String, example: '졸린 도도' })
+  nickname: string | null;
+
+  @ApiProperty({ example: true })
+  isMe: boolean;
+
+  @ApiProperty({ example: false })
+  isCreator: boolean;
+
+  @ApiProperty({ description: '누적 집중 시간(초)', example: 1200 })
+  focusedSeconds: number;
+
+  @ApiProperty({
+    description:
+      '집중하지 못한 시간(초) = 목표 시간 - 누적 집중 시간 (일시정지·얼굴 인식 안 됨·연결 끊김 포함)',
+    example: 600,
+  })
+  unfocusedSeconds: number;
+
+  @ApiProperty({ description: '최종 복원도 0~1', example: 0.6667 })
+  restoration: number;
+
+  @ApiProperty({
+    description: '공부가 끝날 때 연결이 끊겨 있었는지 (조각이 자동 배치된다)',
+    example: false,
+  })
+  absent: boolean;
+}
+
+export class ResultResponseDto {
+  @ApiProperty({ enum: SESSION_STATUSES, example: 'ASSEMBLING' })
+  status: SessionStatus;
+
+  @ApiProperty({ description: '목표 시간(초)', example: 1800 })
+  goalSeconds: number;
+
+  @ApiProperty({ description: '팀 통과(조립 완료) 여부', example: false })
+  completed: boolean;
+
+  @ApiProperty({
+    description: '팀 평균 복원도 0~1',
+    example: 0.75,
+  })
+  averageRestoration: number;
+
+  @ApiProperty({
+    type: [ResultMemberDto],
+    description: '참가자별 결과, 입장 순서',
+  })
+  members: ResultMemberDto[];
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    example: '2026-11-22T03:30:15.000Z',
   })
   serverNow: Date;
 }

@@ -1,5 +1,5 @@
 /**
- * 세션 시계·복원도 계산 (F-003, F-004, F-005, F-009). DB·현재 시각에 의존하지 않는 순수 함수다.
+ * 세션 시계·단절 판정 (F-003, F-004, F-005). 복원도는 focus-time.ts가 계산한다. DB·현재 시각에 의존하지 않는 순수 함수다.
  * 모든 시각은 서버 시각을 쓴다. 기기 시계를 바꿔도 결과가 바뀌지 않는다 (AC-019).
  */
 
@@ -95,36 +95,4 @@ export function isDisconnected(
   if (!end) return false;
   const reference = Math.min(now.getTime(), end.getTime());
   return reference - lastHeartbeatAt.getTime() > timeoutSeconds * MS;
-}
-
-/**
- * 이번 조회·heartbeat에서 새로 기록할 고정 시각. 이미 고정됐으면 null (AC-015, AC-019: 덮어쓰지 않음).
- * 끊긴 시점이 불명확하므로 마지막으로 확인한 시각(lastHeartbeatAt)으로 고정한다.
- */
-export function nextFrozenAt(
-  timer: SessionTimer,
-  participant: { lastHeartbeatAt: Date; frozenAt: Date | null },
-  now: Date,
-  timeoutSeconds: number,
-): Date | null {
-  if (participant.frozenAt) return null;
-  return isDisconnected(timer, participant.lastHeartbeatAt, now, timeoutSeconds)
-    ? participant.lastHeartbeatAt
-    : null;
-}
-
-/**
- * 복원도 0~1 (F-009). 끊긴 사람은 frozenAt에서 멈추고, 나머지는 공통 타이머를 따른다.
- *   restoration = clamp((min(frozenAt ?? now, endsAt) - startedAt) / goalSeconds, 0, 1)
- * 같은 입력이면 어느 기기에서 조회해도 같은 값이다 (AC-040).
- */
-export function restoration(
-  timer: SessionTimer,
-  frozenAt: Date | null,
-  now: Date,
-): number {
-  if (!timer.startedAt) return 0;
-  const stop = frozenAt && frozenAt.getTime() < now.getTime() ? frozenAt : now;
-  const ratio = elapsedSeconds(timer, stop) / timer.goalSeconds;
-  return Math.min(Math.max(ratio, 0), 1);
 }
