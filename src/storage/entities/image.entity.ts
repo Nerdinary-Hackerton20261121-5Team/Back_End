@@ -6,12 +6,12 @@ import {
 } from 'typeorm';
 
 /** 기본 이미지 (F-008). 서비스 자산이라 세션이 폐기돼도 지우지 않는다. */
-@Entity({ name: 'default_image', comment: '기본 이미지' })
-export class DefaultImage {
+@Entity({ name: 'images', comment: '기본 이미지' })
+export class Image {
   @PrimaryGeneratedColumn({
     type: 'bigint',
-    name: 'default_image_id',
-    comment: '기본 이미지 ID',
+    name: 'image_id',
+    comment: '이미지 ID',
   })
   id: number;
 
@@ -25,12 +25,6 @@ export class DefaultImage {
     comment: '이미지 URL',
   })
   imageUrl: string;
-
-  @Column({ type: 'int', comment: '가로 크기' })
-  width: number;
-
-  @Column({ type: 'int', comment: '세로 크기' })
-  height: number;
 
   @CreateDateColumn({
     name: 'created_at',
