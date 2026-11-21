@@ -57,16 +57,19 @@ describe('조각 이미지 API (e2e)', () => {
     return sharp(Buffer.from(svg)).png().toBuffer();
   }
 
-  async function upload(): Promise<string> {
+  /** 업로드 응답은 imageId만 준다(저장소 key는 내부 값). key는 검증용으로 DB에서 읽는다 */
+  async function upload(): Promise<{ imageId: number; imageKey: string }> {
     const res = await http()
       .post('/api/images')
       .attach('file', await puzzlePng(), 'puzzle.png')
       .expect(201);
-    // 앱 전역 응답 형식: { data: { key, ... } }
-    const key = res.body.data.key as string;
-    expect(key).toMatch(/^[0-9a-f-]{36}\.png$/);
-    imageKeys.push(key);
-    return key;
+    const imageId = res.body.data.imageId as number;
+    const { imageKey } = await dataSource
+      .getRepository(Image)
+      .findOneByOrFail({ id: imageId });
+    expect(imageKey).toMatch(/^[0-9a-f-]{36}\.png$/);
+    imageKeys.push(imageKey!);
+    return { imageId, imageKey: imageKey! };
   }
 
   interface Member {
@@ -148,9 +151,9 @@ describe('조각 이미지 API (e2e)', () => {
       .update({ sessionId }, { lastHeartbeatAt: new Date() });
   }
 
-  it('업로드 key로 방을 만들면 images 행이 생기고 진행판에 이미지 경로·모양이 나온다', async () => {
-    const imageKey = await upload();
-    const { sessionId, members } = await startedRoom({ imageKey });
+  it('업로드 imageId로 방을 만들면 그 이미지가 연결되고 진행판에 이미지 경로·모양이 나온다', async () => {
+    const { imageId, imageKey } = await upload();
+    const { sessionId, members } = await startedRoom({ imageId });
 
     const session = await dataSource
       .getRepository(Session)
@@ -176,8 +179,8 @@ describe('조각 이미지 API (e2e)', () => {
   });
 
   it('내 조각은 선명, 남의 조각은 블러 / 같은 사람의 조각 2개는 같은 단계 / 100%여도 블러', async () => {
-    const imageKey = await upload();
-    const { sessionId, members } = await startedRoom({ imageKey });
+    const { imageId } = await upload();
+    const { sessionId, members } = await startedRoom({ imageId });
     await rewind(sessionId, 150); // 600초 중 150초 = 25%
     const host = members[0].participantToken;
 
@@ -222,7 +225,9 @@ describe('조각 이미지 API (e2e)', () => {
       (await pieceImage(sessionId, 1, host).expect(404)).body.toString(),
     ).toContain('SESSION_IMAGE_NOT_SET');
 
-    const withImage = await startedRoom({ imageKey: await upload() });
+    const withImage = await startedRoom({
+      imageId: (await upload()).imageId,
+    });
     const token = withImage.members[0].participantToken;
     expect(
       (

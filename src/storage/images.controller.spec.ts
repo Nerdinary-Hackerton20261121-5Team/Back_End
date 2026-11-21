@@ -4,7 +4,6 @@ import { InMemoryDisk, StorageModule } from '@nestjs/storage';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
-import { ParticipantGuard } from '../auth/participant.guard.js';
 import { Image } from './entities/image.entity.js';
 import { ImageUrlService } from './image-url.service.js';
 import { ImagesController, MAX_IMAGE_SIZE } from './images.controller.js';
@@ -45,11 +44,7 @@ describe('ImagesController (POST /images)', () => {
         ImagesService,
         { provide: getRepositoryToken(Image), useValue: images },
       ],
-    })
-      // 토큰 확인은 auth 쪽 테스트가 맡는다. 여기서는 통과시킨다
-      .overrideGuard(ParticipantGuard)
-      .useValue({ canActivate: () => true })
-      .compile();
+    }).compile();
     app = moduleRef.createNestApplication();
     await app.init();
   });
