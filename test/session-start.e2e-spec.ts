@@ -5,7 +5,6 @@ import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module.js';
-import { AssemblyPiece } from '../src/assembly/entities/assembly-piece.entity.js';
 import { SourcePiece } from '../src/puzzle/entities/source-piece.entity.js';
 import { Participant } from '../src/sessions/entities/participant.entity.js';
 import { Session } from '../src/sessions/entities/session.entity.js';
@@ -89,7 +88,7 @@ describe('세션 시작 API (e2e)', () => {
     return sources;
   }
 
-  it('200: 4명 방 시작 → 명단 고정, 종료 시각, 4×2 격자에 조각 8개(1명당 2개), 조립 조각 없음', async () => {
+  it('200: 4명 방 시작 → 명단 고정, 종료 시각, 4×2 격자에 조각 8개(1명당 2개), 모두 대기 영역', async () => {
     const room = await roomWith(4);
     const res = await start(room.sessionId, room.participantToken).expect(200);
     const data = res.body.data;
@@ -107,12 +106,11 @@ describe('세션 시작 API (e2e)', () => {
     });
     expect(Date.parse(data.endsAt) - Date.parse(data.startedAt)).toBe(60_000);
 
-    await expectPieceLayout(room.sessionId, 4);
-    expect(
-      await dataSource
-        .getRepository(AssemblyPiece)
-        .count({ where: { sessionId: room.sessionId } }),
-    ).toBe(0);
+    const pieces = await expectPieceLayout(room.sessionId, 4);
+    // 조립판에는 아직 아무 조각도 놓이지 않았다
+    expect(pieces.every((p) => p.placedAt === null && !p.autoPlaced)).toBe(
+      true,
+    );
 
     const participants = await dataSource
       .getRepository(Participant)
