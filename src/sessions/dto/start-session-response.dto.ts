@@ -53,7 +53,8 @@ export class StartSessionResponseDto {
   splitCount: number;
 
   @ApiProperty({
-    description: '조립 조각 수. 조립 조각을 만들지 않아 항상 0 (호환용)',
+    description:
+      '조립 조각 수. 조립은 조각(pieceCount)을 그대로 쓰므로 항상 0 (호환용)',
     example: 0,
   })
   assemblyPieceCount: number;

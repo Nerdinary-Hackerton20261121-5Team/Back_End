@@ -10,11 +10,11 @@ export const AssemblyErrors = {
   PIECE_NOT_FOUND: {
     code: 'PIECE_NOT_FOUND',
     status: HttpStatus.NOT_FOUND,
-    message: '조립 조각을 찾을 수 없습니다.',
+    message: '조각을 찾을 수 없습니다.',
   },
   NOT_PIECE_OWNER: {
     code: 'NOT_PIECE_OWNER',
     status: HttpStatus.FORBIDDEN,
-    message: '자기 원조각에서 나온 조각만 옮길 수 있습니다.',
+    message: '자기 조각만 옮길 수 있습니다.',
   },
 } as const satisfies Record<string, ErrorDefinition>;

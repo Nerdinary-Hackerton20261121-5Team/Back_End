@@ -18,6 +18,8 @@ export const PIECES_PER_PARTICIPANT = 2;
  * 칸 번호(slot)는 왼쪽 위부터 1이다.
  * - position: 정답 칸. 결과 화면에서 조각이 놓이는 자리
  * - display_slot: 공부 중 화면에 놓이는 칸. 시작할 때 랜덤으로 정하고, 조각의 정답 칸과 겹치지 않는다
+ * - placed_at: 조립판(F-006)에서 정답 칸에 놓인 일시. 틀린 칸은 저장하지 않으므로
+ *   조각은 대기 영역(NULL)이거나 정답 칸(position)에 놓인 상태 둘 중 하나다
  * 진행률은 참가자 단위라 같은 참가자의 조각 2개가 함께 쓴다.
  */
 @Entity({ name: 'source_piece', comment: '조각' })
@@ -66,4 +68,21 @@ export class SourcePiece {
     comment: '공부 중 화면 배치 slot (정답 slot과 다름, NULL = 미배정)',
   })
   displaySlot: number | null;
+
+  @Column({
+    name: 'placed_at',
+    type: 'datetime',
+    precision: 3,
+    nullable: true,
+    comment: '조립판 정답 칸에 놓인 일시 (NULL = 대기 영역)',
+  })
+  placedAt: Date | null;
+
+  @Column({
+    name: 'auto_placed',
+    type: 'boolean',
+    default: false,
+    comment: '집중 종료 때 부재로 자동 배치됐는지',
+  })
+  autoPlaced: boolean;
 }

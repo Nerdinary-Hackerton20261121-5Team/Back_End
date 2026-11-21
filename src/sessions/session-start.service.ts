@@ -19,7 +19,7 @@ import { SessionErrors } from './sessions.errors.js';
  * 세션 시작 (F-002, F-003, F-008).
  * 세션 행을 잠근 채로 명단 고정 → 시작·종료 시각 확정 → 조각 생성을 한 트랜잭션에서 한다.
  * 조각은 참가자당 2개이고, 공부 중 배치 칸(display_slot)을 서로 겹치지 않게 랜덤으로 정한다.
- * 조립 조각(assembly_piece)은 만들지 않는다.
+ * 조립도 이 조각을 그대로 쓰므로(source_piece.placed_at) 따로 만드는 조각은 없다.
  * 입장(join)도 같은 행을 잠그므로, 시작과 입장이 동시에 와도 시작 시점 명단이 기준이 된다 (AC-005).
  */
 @Injectable()
