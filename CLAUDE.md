@@ -1,14 +1,14 @@
 @AGENTS.md
 @docs/Coding/NESTJS.md
 
-브랜치·PR·배포·비밀값 규칙은 AGENTS.md 9절을 따른다. 기능 브랜치 → PR(base `main`) 순서이고 `main` 머지가 곧 운영 배포다.
+브랜치·PR·배포·비밀값 규칙은 AGENTS.md 9절을 따른다. 기능 브랜치 → PR(base `dev`) → `dev`(dev 서버) → `dev`→`main` PR → `main`(운영) 순서이고, `dev` 머지가 dev 서버 배포, `main` 머지가 운영 배포다.
 
 # 프로젝트 초기 구조 (백엔드)
 
 팀원 누구나 AI 에이전트로 작업을 시작할 때 이 구조를 기준으로 삼는다.
 구조·스크립트·전역 설정을 바꾸면 이 절도 함께 고친다.
 
-- 원격: https://github.com/Nerdinary-Hackerton20261121-5Team/Back_End (기본 브랜치 `main`)
+- 원격: https://github.com/Nerdinary-Hackerton20261121-5Team/Back_End (기본 브랜치 `dev`)
 - 스택: NestJS 12 · TypeScript 6 · ESM(`"type": "module"`) · Express 플랫폼 · Vitest · oxlint · Prettier
 
 ## 폴더·파일
@@ -20,7 +20,7 @@
 | `src/app.controller.ts`, `src/app.service.ts` | 샘플. 실제 기능은 `src/<기능>/` 모듈로 추가 | O |
 | `src/health/` | `GET /api/health` → 200 `{status, commit}`. 클러스터 probe가 쓰므로 경로·200 응답을 유지 | O |
 | `Dockerfile`, `.dockerignore` | 운영 이미지(포트 3000, `GIT_SHA` build-arg) | O |
-| `.github/workflows/` | `ci.yml` PR 검증, `deploy.yml` main 머지 시 registry.bemelon.me/cmc-11th push → cluster-config 태그 갱신 → Argo CD 배포 | O |
+| `.github/workflows/` | `ci.yml` PR 검증, `deploy.yml` dev·main 머지 시 registry.bemelon.me/cmc-11th push → cluster-config 태그 갱신(dev→`be-dev`, main→`be`) → Argo CD 배포 | O |
 | `src/**/*.spec.ts` | 단위 테스트(코드 옆에 둠) | O |
 | `test/` | e2e 테스트 (`vitest.config.e2e.ts`) | O |
 | `docs/Coding/NESTJS.md` | NestJS 기술 지침 | O |
