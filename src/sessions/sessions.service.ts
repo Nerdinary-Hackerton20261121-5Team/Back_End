@@ -157,7 +157,6 @@ export class SessionsService {
       goalSeconds: session.goalSeconds,
       maxParticipants: session.maxParticipants,
       participantCount,
-      allowRandom: session.allowRandom,
       splitCount: session.splitCount,
       startedAt: session.startedAt,
       endsAt: session.endsAt,
@@ -262,7 +261,6 @@ export class SessionsService {
         maxParticipants: dto.maxParticipants,
         goalSeconds: dto.goalSeconds,
         splitCount: SPLIT_COUNT,
-        allowRandom: dto.allowRandom ?? false,
         status: 'WAITING',
       }),
     );

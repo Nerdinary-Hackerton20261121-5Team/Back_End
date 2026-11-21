@@ -108,6 +108,26 @@ describe('세션 API (e2e)', () => {
       const res = await http().post('/api/sessions').send({}).expect(400);
       expect(res.body.code).toBe('INVALID_INPUT');
     });
+
+    it('#59 400: 제외된 allowRandom을 보내면 거절하고, 조회 응답에도 없다', async () => {
+      const res = await http()
+        .post('/api/sessions')
+        .send({
+          goalSeconds: 60,
+          maxParticipants: 4,
+          allowRandom: true,
+          clientRequestId: randomUUID(),
+        })
+        .expect(400);
+      expect(res.body.code).toBe('INVALID_INPUT');
+
+      const data = await createSession();
+      const detail = await http()
+        .get(`/api/sessions/${data.sessionId}`)
+        .set('X-Participant-Token', data.participantToken)
+        .expect(200);
+      expect(detail.body.data).not.toHaveProperty('allowRandom');
+    });
   });
 
   describe('POST /api/sessions/join', () => {

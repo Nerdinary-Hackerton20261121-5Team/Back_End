@@ -66,6 +66,7 @@ export class Session {
     default: false,
     comment: '랜덤 참가 허용 여부',
   })
+  /** @deprecated 랜덤 매칭 제외(#59). API에서 쓰지 않고, 컬럼은 운영 반영 후 마이그레이션으로 삭제 예정 */
   allowRandom: boolean;
 
   @Column({

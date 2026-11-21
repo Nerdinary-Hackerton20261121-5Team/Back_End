@@ -69,9 +69,6 @@ export class SessionDetailResponseDto {
   @ApiProperty({ description: '현재 입장 인원', example: 1 })
   participantCount: number;
 
-  @ApiProperty({ example: false })
-  allowRandom: boolean;
-
   @ApiProperty({ description: '조립 분할 수 (1/4 → 4)', example: 4 })
   splitCount: number;
 

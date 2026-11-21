@@ -72,7 +72,7 @@ Swagger에서 요청·응답 예시를 보고 바로 호출할 수 있습니다.
 |---|---|---|---|---|---|
 | GET | `/api/health` | 서버 상태·배포 커밋 확인 (공통 형식으로 감싸지 않음) | - | 200 | - |
 | POST | `/api/images` | 이미지 업로드 (multipart, 필드명 `file`). 저장소 key와 보여주기용·썸네일 주소 반환 | - | 201 | 400 |
-| POST | `/api/sessions` | 방 만들기 (목표 시간·정원 4~6명·랜덤 허용). 세션 코드와 개설자 `participantToken` 발급. 같은 `clientRequestId` 재전송은 기존 방 반환 | - | 201 | 400 |
+| POST | `/api/sessions` | 방 만들기 (목표 시간·정원 4~6명). 세션 코드와 개설자 `participantToken` 발급. 같은 `clientRequestId` 재전송은 기존 방 반환 | - | 201 | 400 |
 | POST | `/api/sessions/join` | 세션 코드로 입장. 참가자 `participantToken` 발급 | - | 201 | 400, 404, 409(시작됨·정원 참) |
 | GET | `/api/sessions/{sessionId}` | 세션 조회 (단계·남은 시간·인원·내 정보, `serverNow`) | O | 200 | 400, 401, 403, 404 |
 | DELETE | `/api/sessions/{sessionId}/participants/me` | 대기실 나가기 (시작 전). 내 참가자 정보 삭제 → 토큰 무효·자리 비움. 방장이 나가면 다음 입장 순서가 방장, 마지막 한 명이면 방 삭제 | O | 200 | 400, 401, 403(다른 세션), 404, 409(시작됨) |
