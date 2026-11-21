@@ -62,6 +62,15 @@ export class Participant {
   isCreator: boolean;
 
   @Column({
+    name: 'nickname',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+    comment: '닉네임',
+  })
+  nickname: string | null;
+
+  @Column({
     name: 'last_heartbeat_at',
     type: 'datetime',
     precision: 3,
