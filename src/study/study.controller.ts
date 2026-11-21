@@ -17,6 +17,10 @@ import {
   ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  ApiPiecePositionParam,
+  ApiSessionIdParam,
+} from '../common/swagger/api-params.decorators.js';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { ParticipantAuth } from '../auth/participant-auth.decorator.js';
@@ -42,6 +46,7 @@ import { StudyErrors } from './study.errors.js';
 import { StudyService } from './study.service.js';
 
 @ApiTags('study')
+@ApiSessionIdParam()
 @Controller('sessions')
 export class StudyController {
   constructor(
@@ -117,6 +122,7 @@ export class StudyController {
   }
 
   @Get(':sessionId/pieces/:position/image')
+  @ApiPiecePositionParam()
   @ParticipantAuth()
   // 이미지 바이트를 그대로 보낸다 (공통 { data } 응답으로 감싸지 않음)
   @RawResponse()
