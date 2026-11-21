@@ -91,3 +91,52 @@ mode가 template이면 보관본을 실제 프로젝트처럼 진행하지 않�
 
 NestJS 버전·ESM 규칙·테스트(Vitest)·Observe 관련 안내는 [NestJS 기술 지침](docs/Coding/NESTJS.md)을 따른다.
 코드 작업 전에 이 문서를 읽는다.
+
+## 9. 협업·배포 규칙 (사람·AI 기여자 공통)
+
+위 1~8의 해커톤 공통 규칙에 더해, 이 저장소에서 코드를 고치거나 배포에 닿는 모든 기여자가 따른다.
+배포 흐름과 주소는 [README의 배포·운영 한눈에 보기](README.md#배포운영-한눈에-보기)에 있다.
+
+### 브랜치·PR
+
+- `main`에서 딴 작업 브랜치(`feat/작업명`, `fix/작업명`, `docs/작업명`, `chore/작업명`, `ci/작업명`)에서 작업하고 PR로 합친다.
+  `main`에 직접 push하지 않는다(보호 브랜치, 승인 1명 필요). force push·rebase로 공유 이력을 고치지 않는다.
+- **PR의 base는 `main`이다.** GitHub 기본 브랜치 설정이 아직 `dev`라서 웹 PR 화면·`gh pr create`의 base가 `dev`로 잡힌다.
+  `dev`는 `main`보다 뒤처져 CI·Dockerfile·배포 워크플로가 없고 거기에 머지해도 배포되지 않으니 base를 `main`으로 바꿔서 연다.
+- 커밋은 `종류: 내용` 형식(`feat`·`fix`·`docs`·`chore`·`ci`·`refactor`·`test`)으로 기능 단위로 나눈다.
+  PR 본문은 `.github/PULL_REQUEST_TEMPLATE.md` 양식을 채우고 관련 이슈는 `closes #번호`로 잇는다.
+- 커밋·PR에 AI 공동작성자(Co-Authored-By)나 에이전트 도구 표기를 넣지 않는다.
+- PR을 열기 전에 `npm run lint`·`npm run build`·`npm test`를 통과시킨다. 같은 검사(`CI`)가 PR에서 자동으로 돈다.
+- 공통 API·데이터 구조·`.github/workflows/`·`Dockerfile`처럼 배포나 다른 파트에 영향이 있는 변경은 PR 설명에 영향 범위를 적고 담당자와 먼저 맞춘다(2절).
+
+### 배포
+
+- 배포는 **`main` 머지로만** 일어난다. `main`에 머지하면 곧바로 운영(https://cmc-11th.bemelon.me)에 반영되므로 CI가 초록인지 확인하고 머지한다.
+  머지 뒤에는 Actions `Deploy`가 초록인지, `/api/health`의 `commit`이 방금 머지한 커밋인지 본다.
+- 수동 배포는 하지 않는다. `docker push`로 이미지를 직접 올리거나, `kubectl`·Argo CD 화면으로 운영 리소스를 직접 고치지 않는다.
+  Argo CD는 cluster-config의 `main`과 다른 상태를 자동으로 되돌리므로(selfHeal) 손으로 고쳐도 남지 않는다.
+- `Deploy`를 수동 실행(workflow_dispatch)할 때도 `main`만 고른다. 다른 브랜치는 건너뛰어진다.
+- 문제가 생기면 cluster-config에서 해당 `deploy(be)` 커밋을 `git revert` 해 push한다(force push 금지). 이 레포의 코드는 별도 PR로 고친다.
+- 이미지는 `linux/amd64`(홈서버)로만 빌드하고, 레이어 하나가 100MB를 넘으면 레지스트리 push가 `413`으로 실패하니(Cloudflare 한도) 모델·동영상 같은 큰 파일을 이미지에 넣지 않는다.
+
+### 비밀값
+
+- 이 저장소는 공개다. 비밀번호·토큰·API 키·Observe 키(`OBSERVE_APP_KEY`·`OBSERVE_APP_SECRET`)·`.env` 내용을 코드·문서·이슈·PR·커밋 메시지·스크린샷 어디에도 올리지 않는다.
+  `.env`는 `.gitignore`에 있으며 로컬에서만 쓴다. 실수로 올렸다면 지우는 것으로 끝나지 않으니(이력에 남는다) 바로 운영자에게 알려 교체한다.
+- 운영 환경변수는 클러스터가 주입한다. 이 레포에는 **이름만** 적는다: `PORT`, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `DB_LOGGING`, `CORS_ORIGIN`, `GIT_SHA`.
+  값 중 `DB_PASSWORD`는 운영자가 클러스터 Secret으로 관리한다. 변수를 더해야 하면 cluster-config의 `apps/be/secret.yaml` 변경이 필요하니 운영자와 맞춘다.
+- DB 비밀번호는 운영자에게 직접 받고 개인 `.env`에만 둔다. 운영 DB는 백업이 없으니 `DROP`·대량 `DELETE` 전에 한 번 더 확인한다.
+
+### 코드 계약 (바꾸면 배포가 깨진다)
+
+- `main.ts`의 `setGlobalPrefix('api')`를 유지한다. 게이트웨이가 `/api/*`를 경로 그대로 넘기고 `/api`를 떼지 않는다.
+- `GET /api/health`가 200 `{status, commit}`을 계속 돌려줘야 한다(`src/health/`). 파드의 probe가 이 경로를 쓰므로 없애거나 인증을 걸면 새 파드가 Ready가 되지 않고 롤링 업데이트가 멈춘다.
+- 컨테이너는 `PORT`(운영 3000)에서 받는다. `Dockerfile`의 포트·`GIT_SHA` build-arg를 유지한다.
+- DB 연결은 위 `DB_*` 환경변수 이름을 그대로 읽는다. 다른 이름을 만들면 운영에서 값이 들어오지 않는다.
+- 운영 `CORS_ORIGIN`은 `https://cmc-11th.bemelon.me` 하나다. FE는 같은 origin이라 CORS 없이 `/api/...`를 부른다.
+- Swagger 문서(`/docs`)는 게이트웨이가 `/api/*`만 이 서버로 보내서 공개 주소로는 열리지 않는다. 공개 주소에서 보려면 경로를 `api/docs`로 옮긴다.
+
+### 막히면
+
+클러스터·레지스트리·Argo CD 비밀번호·클러스터 Secret(DB 비밀번호 등)·배포 실패처럼 이 저장소 밖의 문제는 **운영자**에게 묻는다.
+Argo CD(https://cmc-11th-argocd.bemelon.me, 계정 `cmc-11th`)에서 파드 이벤트·로그를 먼저 보고, 본 내용을 함께 전하면 빠르다.

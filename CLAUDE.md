@@ -1,12 +1,14 @@
 @AGENTS.md
 @docs/Coding/NESTJS.md
 
+브랜치·PR·배포·비밀값 규칙은 AGENTS.md 9절을 따른다. `main` 머지가 곧 운영 배포다.
+
 # 프로젝트 초기 구조 (백엔드)
 
 팀원 누구나 AI 에이전트로 작업을 시작할 때 이 구조를 기준으로 삼는다.
 구조·스크립트·전역 설정을 바꾸면 이 절도 함께 고친다.
 
-- 원격: https://github.com/Nerdinary-Hackerton20261121-5Team/Back_End (기본 브랜치 `main`)
+- 원격: https://github.com/Nerdinary-Hackerton20261121-5Team/Back_End (배포 브랜치 `main`. GitHub 기본 브랜치 설정은 아직 `dev`라서 PR의 base를 `main`으로 직접 고른다)
 - 스택: NestJS 12 · TypeScript 6 · ESM(`"type": "module"`) · Express 플랫폼 · Vitest · oxlint · Prettier
 
 ## 폴더·파일
