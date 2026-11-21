@@ -17,6 +17,7 @@ import {
   ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { ParticipantAuth } from '../auth/participant-auth.decorator.js';
 import {
@@ -49,6 +50,8 @@ export class StudyController {
   ) {}
 
   @Post(':sessionId/heartbeat')
+  // 1초 주기라 같은 와이파이 여러 명이면 IP당 한도에 닿을 수 있어 제한에서 뺀다 (#84). 토큰 필요, 본인 기록만 갱신
+  @SkipThrottle()
   @HttpCode(HttpStatus.OK)
   @ParticipantAuth()
   @ApiOperation({

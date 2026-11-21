@@ -9,7 +9,7 @@ describe('policy', () => {
     vi.stubEnv('POLICY_GOAL_MIN_SECONDS', '');
     expect(goalSecondsRange()).toEqual({ min: 60, max: 14400 });
     expect(heartbeatPolicy()).toEqual({
-      intervalSeconds: 10,
+      intervalSeconds: 1,
       disconnectTimeoutSeconds: 90,
     });
   });

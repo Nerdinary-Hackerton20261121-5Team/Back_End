@@ -32,14 +32,15 @@ export function goalSecondsRange(): { min: number; max: number } {
 
 /**
  * 연결 확인 주기와 단절 판정 기준(초).
- * TODO(Q-003): 팀 확정 전 임시값. 백그라운드 탭 타이머 지연을 고려해 단절 기준은 주기보다 넉넉히 둔다.
+ * TODO(Q-003): 팀 확정 전 임시값. 주기는 상태·진행도가 바로 보이도록 1초(#84).
+ * 백그라운드 탭 타이머 지연을 고려해 단절 기준은 주기보다 넉넉히 둔다.
  */
 export function heartbeatPolicy(): {
   intervalSeconds: number;
   disconnectTimeoutSeconds: number;
 } {
   return {
-    intervalSeconds: intFromEnv('POLICY_HEARTBEAT_SECONDS', 10),
+    intervalSeconds: intFromEnv('POLICY_HEARTBEAT_SECONDS', 1),
     disconnectTimeoutSeconds: intFromEnv(
       'POLICY_DISCONNECT_TIMEOUT_SECONDS',
       90,
