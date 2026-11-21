@@ -17,10 +17,13 @@ describe('AppController (e2e)', () => {
   });
 
   it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+    // CommonModule의 ResponseInterceptor가 공통 응답 형식으로 감싼다
+    return request(app.getHttpServer()).get('/').expect(200).expect({
+      success: true,
+      code: 'SUCCESS',
+      message: '요청이 성공했습니다.',
+      data: 'Hello World!',
+    });
   });
 
   afterEach(async () => {

@@ -42,6 +42,37 @@ npm run start:dev
 | `PORT` | 서버 포트 | `3000` |
 | `CORS_ORIGIN` | 허용할 프론트엔드 주소 (콤마로 여러 개) | 비워두면 전체 허용 |
 
+## API 명세
+
+Swagger에서 요청·응답 예시를 보고 바로 호출할 수 있습니다.
+
+- 로컬: http://localhost:3000/docs
+- dev: https://cmc-11th-dev.bemelon.me/docs
+- 운영: https://cmc-11th.bemelon.me/docs
+
+**공통 응답 형식**
+
+```json
+{ "success": true,  "code": "SUCCESS",       "message": "요청이 성공했습니다.", "data": { } }
+{ "success": false, "code": "INVALID_INPUT", "message": "요청 값이 올바르지 않습니다. (...)", "data": null }
+```
+
+| HTTP | code | 언제 |
+|---|---|---|
+| 200 / 201 | `SUCCESS` | 조회·수정 성공 / 생성 성공 |
+| 400 | `INVALID_INPUT` | 필수 값 누락, 잘못된 형식, 정의되지 않은 필드, 깨진 JSON |
+| 404 | `NOT_FOUND` 또는 기능별 코드 | 없는 경로, 없는 대상 |
+| 500 | `INTERNAL_ERROR` | 서버 내부 오류 (내부 메시지는 노출하지 않음) |
+
+참가자 토큰이 필요한 API는 `X-Participant-Token` 헤더를 씁니다. Swagger에서는 **Authorize** 버튼에 토큰을 넣으면 됩니다.
+
+### API 목록
+
+| 메서드 | 경로 | 설명 | 토큰 | 성공 | 실패 |
+|---|---|---|---|---|---|
+| GET | `/api/health` | 서버 상태·배포 커밋 확인 (공통 형식으로 감싸지 않음) | - | 200 | - |
+| POST | `/api/images` | 이미지 업로드 (multipart, 필드명 `file`). 저장소 key와 보여주기용·썸네일 주소 반환 | - | 201 | 400 |
+
 ## 프로젝트 구조
 
 ```
@@ -182,4 +213,5 @@ git revert <sha> && git push origin main
 
 | 이름 | 역할 | GitHub |
 |---|---|---|
-| <!-- TODO --> | | |
+| 황규도 | 백엔드 | <!-- TODO --> |
+| 이건하 | 백엔드 | <!-- TODO --> |
