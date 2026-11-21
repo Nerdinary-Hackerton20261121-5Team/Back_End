@@ -22,4 +22,9 @@ export const SessionErrors = {
     status: HttpStatus.FORBIDDEN,
     message: '개설자만 할 수 있습니다.',
   },
+  NOT_ENOUGH_PARTICIPANTS: {
+    code: 'NOT_ENOUGH_PARTICIPANTS',
+    status: HttpStatus.BAD_REQUEST,
+    message: '최소 4명이 입장해야 시작할 수 있습니다.',
+  },
 } as const satisfies Record<string, ErrorDefinition>;

@@ -13,6 +13,9 @@ function intFromEnv(name: string, fallback: number): number {
 /** 방 정원 선택지 (팀 확정: 4·5·6명) */
 export const ALLOWED_CAPACITIES = [4, 5, 6] as const;
 
+/** 세션을 시작할 수 있는 최소 인원 (팀 확정: 4명, 개인 세션 없음) */
+export const MIN_START_PARTICIPANTS = 4;
+
 /** 원조각 하나를 나누는 조립 조각 수 (팀 확정: 1/4) */
 export { SPLIT_COUNT } from '../puzzle/puzzle-splitter.js';
 

@@ -44,12 +44,14 @@ export class SessionsController {
   @ApiOperation({
     summary: '세션 시작 (개설자)',
     description:
-      '지금 입장한 인원으로 명단을 고정하고 시작·종료 시각을 확정한다. 인원수만큼 원조각(한 행에 2명)과 조립 조각(원조각당 4개)을 만든다. ' +
+      '최소 4명이 입장해야 시작할 수 있다. 지금 입장한 인원(4~6명)으로 명단을 고정하고 시작·종료 시각을 확정한다. ' +
+      '인원수만큼 원조각(한 행에 2명)과 조립 조각(원조각당 4개)을 만든다. ' +
       '이미 시작된 세션에 다시 보내면 처음 시작한 결과를 그대로 돌려준다. 시작 후에는 새로 입장할 수 없다.',
   })
   @ApiSuccessResponse(StartSessionResponseDto)
   @ApiErrorResponses(
     CommonErrors.INVALID_INPUT,
+    SessionErrors.NOT_ENOUGH_PARTICIPANTS,
     SessionErrors.NOT_CREATOR,
     SessionErrors.SESSION_NOT_FOUND,
   )
@@ -64,8 +66,8 @@ export class SessionsController {
   @ApiOperation({
     summary: '방 만들기',
     description:
-      '목표 시간·정원·랜덤 허용 여부로 방을 만든다. 개설자도 참가자로 등록되며 응답의 participantToken을 Authorize에 넣는다. ' +
-      '1명으로 시작하면 개인 세션이 된다 (같은 입구).',
+      '목표 시간·정원(4~6명)·랜덤 허용 여부로 방을 만든다. 개설자도 참가자로 등록되며 응답의 participantToken을 Authorize에 넣는다. ' +
+      '최소 4명이 모이면 개설자가 시작할 수 있다.',
   })
   @ApiSuccessResponse(SessionEntryResponseDto, { status: HttpStatus.CREATED })
   @ApiErrorResponses(CommonErrors.INVALID_INPUT)

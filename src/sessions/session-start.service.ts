@@ -4,6 +4,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { AssemblyPiece } from '../assembly/entities/assembly-piece.entity.js';
 import type { RequestParticipant } from '../common/decorators/current-participant.decorator.js';
 import { BusinessException } from '../common/exception/business.exception.js';
+import { MIN_START_PARTICIPANTS } from '../config/policy.js';
 import { SourcePiece } from '../puzzle/entities/source-piece.entity.js';
 import { buildPuzzleLayout } from '../puzzle/puzzle-splitter.js';
 import { endsAt } from '../study/session-clock.js';
@@ -52,6 +53,9 @@ export class SessionStartService {
         order: { joinedAt: 'ASC', id: 'ASC' },
         select: { id: true },
       });
+      if (roster.length < MIN_START_PARTICIPANTS) {
+        throw new BusinessException(SessionErrors.NOT_ENOUGH_PARTICIPANTS);
+      }
 
       const startedAt = new Date();
       const finishAt = endsAt({ startedAt, goalSeconds: session.goalSeconds });
