@@ -1,13 +1,5 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsBoolean,
-  IsIn,
-  IsInt,
-  IsOptional,
-  IsPositive,
-  IsString,
-  Length,
-} from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsIn, IsInt, IsPositive, IsString, Length } from 'class-validator';
 import { ALLOWED_CAPACITIES } from '../../config/policy.js';
 
 export class CreateSessionDto {
@@ -26,15 +18,6 @@ export class CreateSessionDto {
   })
   @IsIn(ALLOWED_CAPACITIES)
   maxParticipants: number;
-
-  @ApiPropertyOptional({
-    description: '랜덤 참가 허용 여부',
-    default: false,
-    example: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  allowRandom?: boolean;
 
   @ApiProperty({
     description:

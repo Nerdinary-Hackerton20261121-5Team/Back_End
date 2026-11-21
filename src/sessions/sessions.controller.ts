@@ -111,7 +111,7 @@ export class SessionsController {
   @ApiOperation({
     summary: '방 만들기',
     description:
-      '목표 시간·정원(4~6명)·랜덤 허용 여부로 방을 만든다. 개설자도 참가자로 등록되며 응답의 participantToken을 Authorize에 넣는다. ' +
+      '목표 시간·정원(4~6명)으로 방을 만든다. 개설자도 참가자로 등록되며 응답의 participantToken을 Authorize에 넣는다. ' +
       '최소 4명이 모이면 개설자가 시작할 수 있다.',
   })
   @ApiSuccessResponse(SessionEntryResponseDto, { status: HttpStatus.CREATED })
