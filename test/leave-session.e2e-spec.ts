@@ -114,10 +114,67 @@ describe('대기실 나가기 API (e2e)', () => {
     expect(res.body.code).toBe('CANNOT_LEAVE_AFTER_START');
   });
 
-  it('403: 개설자는 나갈 수 없다', async () => {
+  it('#56 방장이 나가면 다음 입장 순서가 방장이 되고, 원래 방장의 재전송은 새 방장에게 영향이 없다', async () => {
+    const clientRequestId = randomUUID();
+    const res0 = await http()
+      .post('/api/sessions')
+      .send({ goalSeconds: 60, maxParticipants: 4, clientRequestId })
+      .expect(201);
+    const host = res0.body.data as Entry;
+    created.push(host.sessionId);
+    const second = await join(host.sessionCode);
+    const third = await join(host.sessionCode);
+
+    const res = await leave(host.sessionId, host.participantToken).expect(200);
+    expect(res.body.data).toMatchObject({
+      participantId: host.participantId,
+      left: true,
+      newCreatorId: second.participantId,
+      sessionDeleted: false,
+    });
+
+    // 새 방장 확인, 세 번째 사람은 그대로
+    const asSecond = await http()
+      .get(`/api/sessions/${host.sessionId}`)
+      .set(TOKEN, second.participantToken)
+      .expect(200);
+    expect(asSecond.body.data.me.isCreator).toBe(true);
+    expect(asSecond.body.data.participantCount).toBe(2);
+    const asThird = await http()
+      .get(`/api/sessions/${host.sessionId}`)
+      .set(TOKEN, third.participantToken)
+      .expect(200);
+    expect(asThird.body.data.me.isCreator).toBe(false);
+
+    // 원래 방장이 방 만들기를 재전송해도 새 방장 토큰은 살아 있다 (나간 사람이라 404)
+    await http()
+      .post('/api/sessions')
+      .send({ goalSeconds: 60, maxParticipants: 4, clientRequestId })
+      .expect(404);
+    await http()
+      .get(`/api/sessions/${host.sessionId}`)
+      .set(TOKEN, second.participantToken)
+      .expect(200);
+
+    // 새 방장은 방장 권한(시작)을 쓸 수 있다: 인원 부족 400까지 가면 권한 확인을 통과한 것
+    const start = await http()
+      .post(`/api/sessions/${host.sessionId}/start`)
+      .set(TOKEN, second.participantToken)
+      .expect(400);
+    expect(start.body.code).toBe('NOT_ENOUGH_PARTICIPANTS');
+  });
+
+  it('#56 마지막 한 명(방장)이 나가면 방이 지워진다', async () => {
     const host = await createSession();
-    const res = await leave(host.sessionId, host.participantToken).expect(403);
-    expect(res.body.code).toBe('CREATOR_CANNOT_LEAVE');
+    const res = await leave(host.sessionId, host.participantToken).expect(200);
+    expect(res.body.data).toMatchObject({
+      newCreatorId: null,
+      sessionDeleted: true,
+    });
+    const row = await dataSource
+      .getRepository(Session)
+      .findOneBy({ id: host.sessionId });
+    expect(row).toBeNull();
   });
 
   it('401: 토큰 없음', async () => {

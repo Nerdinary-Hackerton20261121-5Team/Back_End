@@ -24,6 +24,7 @@ import type {
 } from './dto/session-response.dto.js';
 import { Participant } from './entities/participant.entity.js';
 import { Session, type SessionStatus } from './entities/session.entity.js';
+import type { LeaveSessionResponseDto } from './dto/leave-session-response.dto.js';
 import { generateInviteCode } from './invite-code.js';
 import { SessionErrors } from './sessions.errors.js';
 
@@ -190,15 +191,12 @@ export class SessionsService {
   /**
    * 시작 전 대기실 나가기 (F-002, F-011, AC-005).
    * 세션 행을 잠가 입장·시작과 한 줄로 세운다. 참가자 행을 지우므로 토큰은 무효가 되고 자리가 빈다.
-   * TODO: 개설자가 나갈 때 처리(방 삭제 vs 방장 넘기기)는 팀 결정 전이라 막아 둔다 (#53).
+   * 방장이 나가면 입장 순서상 다음 사람이 방장이 되고, 남은 사람이 없으면 방을 지운다 (#56, 팀 결정).
    */
   async leave(
     sessionId: number,
     me: RequestParticipant,
-  ): Promise<{ sessionId: number; participantId: number; left: true }> {
-    if (me.isCreator) {
-      throw new BusinessException(SessionErrors.CREATOR_CANNOT_LEAVE);
-    }
+  ): Promise<LeaveSessionResponseDto> {
     return this.dataSource.transaction(async (manager) => {
       const session = await manager.findOne(Session, {
         where: { id: sessionId },
@@ -210,11 +208,46 @@ export class SessionsService {
       if (session.status !== 'WAITING') {
         throw new BusinessException(SessionErrors.CANNOT_LEAVE_AFTER_START);
       }
-      await manager.delete(Participant, {
-        id: me.participantId,
-        sessionId,
+      // 가드가 확인한 뒤 방장이 바뀌었을 수 있으므로 잠금 안에서 다시 읽는다
+      const leaving = await manager.findOne(Participant, {
+        where: { id: me.participantId, sessionId },
+        select: { id: true, isCreator: true },
       });
-      return { sessionId, participantId: me.participantId, left: true };
+      if (!leaving) {
+        throw new BusinessException(SessionErrors.SESSION_NOT_FOUND);
+      }
+
+      await manager.delete(Participant, { id: leaving.id, sessionId });
+
+      let newCreatorId: number | null = null;
+      let sessionDeleted = false;
+      if (leaving.isCreator) {
+        const next = await manager.findOne(Participant, {
+          where: { sessionId },
+          order: { joinedAt: 'ASC', id: 'ASC' },
+          select: { id: true },
+        });
+        if (next) {
+          await manager.update(
+            Participant,
+            { id: next.id },
+            { isCreator: true },
+          );
+          newCreatorId = next.id;
+        } else {
+          // 아무도 남지 않으면 방을 폐기한다 (POL-010)
+          await manager.delete(Session, { id: sessionId });
+          sessionDeleted = true;
+        }
+      }
+
+      return {
+        sessionId,
+        participantId: leaving.id,
+        left: true,
+        newCreatorId,
+        sessionDeleted,
+      };
     });
   }
 
@@ -250,9 +283,17 @@ export class SessionsService {
     session: Session,
   ): Promise<SessionEntryResponseDto> {
     return this.dataSource.transaction(async (manager) => {
-      const creator = await manager.findOneOrFail(Participant, {
-        where: { sessionId: session.id, isCreator: true },
+      // "지금 방장"이 아니라 이 요청으로 방을 처음 만든 참가자를 돌려준다.
+      // 방장이 넘어간 뒤 재전송이 새 방장의 토큰을 무효로 만들지 않게 한다 (#56)
+      const creator = await manager.findOne(Participant, {
+        where: {
+          sessionId: session.id,
+          joinRequestId: session.createRequestId,
+        },
       });
+      // 처음 만든 사람이 이미 나갔으면 되돌려줄 참가자가 없다
+      if (!creator)
+        throw new BusinessException(SessionErrors.SESSION_NOT_FOUND);
       return this.reissueToken(manager, session, creator);
     });
   }
