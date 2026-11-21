@@ -17,8 +17,7 @@ const inside = (inner: Rect, outer: Rect) =>
   inner.y + inner.h <= outer.y + outer.h + EPS;
 
 describe('sourceGrid', () => {
-  it('한 행에 2명, 1명이면 1×1', () => {
-    expect(sourceGrid(1)).toEqual({ rows: 1, cols: 1 });
+  it('항상 한 행에 2명', () => {
     expect(sourceGrid(4)).toEqual({ rows: 2, cols: 2 });
     expect(sourceGrid(5)).toEqual({ rows: 3, cols: 2 });
     expect(sourceGrid(6)).toEqual({ rows: 3, cols: 2 });
@@ -46,16 +45,15 @@ describe('buildPuzzleLayout', () => {
     expect(sources.slice(0, 4).every((s) => s.rect.w === 0.5)).toBe(true);
   });
 
-  it('AC-024 혼자면 원조각 1개(전체 이미지)를 4개로 나눈다', () => {
-    const { sources, pieces } = buildPuzzleLayout(1);
-    expect(sources).toEqual([
-      { position: 1, rect: { x: 0, y: 0, w: 1, h: 1 } },
-    ]);
-    expect(pieces).toHaveLength(4);
-    expect(pieces.every((p) => p.sourcePosition === 1)).toBe(true);
+  it('두 칸(colSpan 2)은 5명일 때 5번 원조각뿐', () => {
+    const spans = (n: number) =>
+      buildPuzzleLayout(n).sources.map((s) => s.colSpan);
+    expect(spans(4)).toEqual([1, 1, 1, 1]);
+    expect(spans(5)).toEqual([1, 1, 1, 1, 2]);
+    expect(spans(6)).toEqual([1, 1, 1, 1, 1, 1]);
   });
 
-  describe.each([1, 2, 3, 4, 5, 6])('참가자 %i명', (n) => {
+  describe.each([4, 5, 6])('참가자 %i명', (n) => {
     const { sources, pieces } = buildPuzzleLayout(n);
 
     it('원조각 N개, 조립 조각 4N개, 위치 번호는 1부터 빈틈없이', () => {

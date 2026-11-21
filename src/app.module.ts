@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { createObserveModule } from '@nestjs/observe';
+import { AssemblyModule } from './assembly/assembly.module.js';
 import { CommonModule } from './common/common.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
+import { SessionsModule } from './sessions/sessions.module.js';
 import { StorageModule } from './storage/storage.module.js';
+import { StudyModule } from './study/study.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -22,7 +25,10 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       serviceId: 'Hackathon_Back',
     }),
     HealthModule,
+    SessionsModule,
     StorageModule,
+    StudyModule,
+    AssemblyModule,
   ],
 })
 export class AppModule {}

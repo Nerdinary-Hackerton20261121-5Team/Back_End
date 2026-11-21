@@ -1,8 +1,8 @@
 /**
- * 퍼즐 분할 (F-008, F-007). DB·이미지 크기와 무관한 순수 계산이다.
+ * 퍼즐 분할 (F-008). DB·이미지 크기와 무관한 순수 계산이다.
  *
- * 1) 원조각: 시작 시점 명단 인원 N으로 이미지를 나눈다. 한 행에 2명, 행 수 = ceil(N / 2).
- *    N이 홀수면 마지막 사람이 맨 아래 행 전체(두 칸 합친 크기)를 맡는다. N = 1이면 이미지 전체.
+ * 1) 원조각: 시작 시점 명단 인원 N(4·5·6명)으로 이미지를 나눈다. 한 행에 2명, 행 수 = ceil(N / 2).
+ *    N이 홀수(5명)면 마지막 사람이 맨 아래 행 전체(두 칸, colSpan 2)를 맡는다.
  *      N=4 → 2×2 / N=5 → 3행(2, 2, 1) / N=6 → 3×2
  * 2) 조립 조각: 원조각마다 2×2(분할 비율 1/4)로 나눈다. 총 4N개.
  * 3) 위치 번호(position)는 ERD와 같이 왼쪽 위부터 1이다. 같은 행에서는 왼쪽부터.
@@ -27,6 +27,8 @@ export interface Rect {
 export interface SourcePieceLayout {
   /** 원조각 위치 번호, 왼쪽 위부터 1. 명단 순서대로 참가자에게 배정한다 */
   position: number;
+  /** 격자에서 차지하는 칸 수. 홀수 인원의 마지막 원조각만 2 (맨 아래 행 전체) */
+  colSpan: number;
   rect: Rect;
 }
 
@@ -46,13 +48,12 @@ export interface PuzzleLayout {
   pieces: AssemblyPieceLayout[];
 }
 
-/** 원조각 격자 크기. 1명이면 1×1, 그 외에는 한 행에 2명. */
+/** 원조각 격자 크기. 항상 한 행에 2명. */
 export function sourceGrid(participantCount: number): {
   rows: number;
   cols: number;
 } {
   assertPositiveInteger(participantCount);
-  if (participantCount === 1) return { rows: 1, cols: 1 };
   return {
     rows: Math.ceil(participantCount / SOURCE_COLS),
     cols: SOURCE_COLS,
@@ -70,7 +71,12 @@ export function buildPuzzleLayout(participantCount: number): PuzzleLayout {
       sourceRects.push(cell({ x: 0, y: 0, w: 1, h: 1 }, r, rows, c, inRow));
     }
   }
-  const sources = sourceRects.map((rect, i) => ({ position: i + 1, rect }));
+  const sources = sourceRects.map((rect, i) => ({
+    position: i + 1,
+    // 행 전체 너비면 두 칸 (cols가 2일 때 홀수 인원의 마지막 원조각)
+    colSpan: rect.w === 1 && cols > 1 ? cols : 1,
+    rect,
+  }));
 
   const unordered = sources.flatMap((source) =>
     splitIntoQuarters(source.rect).map((rect) => ({
