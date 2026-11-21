@@ -46,3 +46,24 @@ export function heartbeatPolicy(): {
     ),
   };
 }
+
+/**
+ * 요청 횟수 제한 (사용자 IP별, windowSeconds 동안 limit회).
+ * TODO(Q-미등록): 팀 확정 전 임시값. 같은 와이파이를 여러 명이 함께 쓰는 경우를 고려해
+ * 전체 API는 넉넉하게, 남용 위험이 큰 방 만들기·입장만 좁게 둔다.
+ */
+export function throttlePolicy(): {
+  enabled: boolean;
+  windowSeconds: number;
+  defaultLimit: number;
+  createLimit: number;
+  joinLimit: number;
+} {
+  return {
+    enabled: process.env.POLICY_THROTTLE_ENABLED !== 'false',
+    windowSeconds: intFromEnv('POLICY_THROTTLE_WINDOW_SECONDS', 60),
+    defaultLimit: intFromEnv('POLICY_THROTTLE_DEFAULT_LIMIT', 600),
+    createLimit: intFromEnv('POLICY_THROTTLE_CREATE_LIMIT', 20),
+    joinLimit: intFromEnv('POLICY_THROTTLE_JOIN_LIMIT', 60),
+  };
+}

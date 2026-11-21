@@ -10,12 +10,15 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ParticipantAuth } from '../auth/participant-auth.decorator.js';
 import {
   CurrentParticipant,
   type RequestParticipant,
 } from '../common/decorators/current-participant.decorator.js';
 import { CommonErrors } from '../common/exception/error-code.js';
+import { throttlePolicy } from '../config/policy.js';
+import { ThrottleErrors } from '../throttle/throttle.errors.js';
 import {
   ApiErrorResponses,
   ApiSuccessResponse,
@@ -108,6 +111,13 @@ export class SessionsController {
   }
 
   @Post()
+  // 남용 방지: 사용자 IP별 방 만들기 횟수 제한 (#67)
+  @Throttle({
+    default: {
+      limit: () => throttlePolicy().createLimit,
+      ttl: () => throttlePolicy().windowSeconds * 1000,
+    },
+  })
   @ApiOperation({
     summary: '방 만들기',
     description:
@@ -115,12 +125,22 @@ export class SessionsController {
       '최소 4명이 모이면 개설자가 시작할 수 있다.',
   })
   @ApiSuccessResponse(SessionEntryResponseDto, { status: HttpStatus.CREATED })
-  @ApiErrorResponses(CommonErrors.INVALID_INPUT)
+  @ApiErrorResponses(
+    CommonErrors.INVALID_INPUT,
+    ThrottleErrors.TOO_MANY_REQUESTS,
+  )
   create(@Body() dto: CreateSessionDto): Promise<SessionEntryResponseDto> {
     return this.sessions.create(dto);
   }
 
   @Post('join')
+  // 남용 방지: 사용자 IP별 입장 횟수 제한 (#67)
+  @Throttle({
+    default: {
+      limit: () => throttlePolicy().joinLimit,
+      ttl: () => throttlePolicy().windowSeconds * 1000,
+    },
+  })
   @ApiOperation({
     summary: '코드로 입장',
     description:
@@ -132,6 +152,7 @@ export class SessionsController {
     SessionErrors.SESSION_NOT_FOUND,
     SessionErrors.SESSION_ALREADY_STARTED,
     SessionErrors.SESSION_FULL,
+    ThrottleErrors.TOO_MANY_REQUESTS,
   )
   join(@Body() dto: JoinSessionDto): Promise<SessionEntryResponseDto> {
     return this.sessions.join(dto);
