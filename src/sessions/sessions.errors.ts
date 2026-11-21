@@ -1,0 +1,20 @@
+import { HttpStatus } from '@nestjs/common';
+import type { ErrorDefinition } from '../common/exception/error-code.js';
+
+export const SessionErrors = {
+  SESSION_NOT_FOUND: {
+    code: 'SESSION_NOT_FOUND',
+    status: HttpStatus.NOT_FOUND,
+    message: '세션을 찾을 수 없습니다.',
+  },
+  SESSION_ALREADY_STARTED: {
+    code: 'SESSION_ALREADY_STARTED',
+    status: HttpStatus.CONFLICT,
+    message: '이미 시작된 세션에는 입장할 수 없습니다.',
+  },
+  SESSION_FULL: {
+    code: 'SESSION_FULL',
+    status: HttpStatus.CONFLICT,
+    message: '세션 정원이 가득 찼습니다.',
+  },
+} as const satisfies Record<string, ErrorDefinition>;
