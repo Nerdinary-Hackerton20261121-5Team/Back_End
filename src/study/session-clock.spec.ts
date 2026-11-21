@@ -18,11 +18,11 @@ const timer: SessionTimer = { startedAt: T0, goalSeconds: 20 * MIN };
 const notStarted: SessionTimer = { startedAt: null, goalSeconds: 20 * MIN };
 
 describe('sessionPhase / endsAt', () => {
-  it('시작 전 WAITING, 공부 중 STUDYING, 종료 시각부터 ASSEMBLY', () => {
+  it('시작 전 WAITING, 공부 중 FOCUSING, 종료 시각부터 ASSEMBLING', () => {
     expect(sessionPhase(notStarted, at(0))).toBe('WAITING');
-    expect(sessionPhase(timer, at(0))).toBe('STUDYING');
-    expect(sessionPhase(timer, at(20 * MIN - 1))).toBe('STUDYING');
-    expect(sessionPhase(timer, at(20 * MIN))).toBe('ASSEMBLY');
+    expect(sessionPhase(timer, at(0))).toBe('FOCUSING');
+    expect(sessionPhase(timer, at(20 * MIN - 1))).toBe('FOCUSING');
+    expect(sessionPhase(timer, at(20 * MIN))).toBe('ASSEMBLING');
   });
 
   it('종료 예정 시각 = 시작 + 목표 (AC-008)', () => {

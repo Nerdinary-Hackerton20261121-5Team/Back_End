@@ -3,7 +3,8 @@
  * 모든 시각은 서버 시각을 쓴다. 기기 시계를 바꿔도 결과가 바뀌지 않는다 (AC-019).
  */
 
-export type SessionPhase = 'WAITING' | 'STUDYING' | 'ASSEMBLY';
+/** 시간으로 정해지는 단계. ERD session.status 값과 같다. COMPLETED(팀 통과)는 시간이 아니라 조립 결과로 정해져 DB에 저장한다. */
+export type SessionPhase = 'WAITING' | 'FOCUSING' | 'ASSEMBLING';
 
 export interface SessionTimer {
   /** 개설자가 시작한 시각. 시작 전이면 null */
@@ -18,13 +19,13 @@ function endsAtOf(timer: SessionTimer & { startedAt: Date }): Date {
   return new Date(timer.startedAt.getTime() + timer.goalSeconds * MS);
 }
 
-/** 시작 전 WAITING, 공부 중 STUDYING, 종료 시각이 지나면 ASSEMBLY (조회 시점에 계산, 스케줄러 불필요) */
+/** 시작 전 WAITING, 집중 중 FOCUSING, 종료 시각이 지나면 ASSEMBLING (조회 시점에 계산, 스케줄러 불필요) */
 export function sessionPhase(timer: SessionTimer, now: Date): SessionPhase {
   if (!timer.startedAt) return 'WAITING';
   return now.getTime() <
     endsAtOf({ ...timer, startedAt: timer.startedAt }).getTime()
-    ? 'STUDYING'
-    : 'ASSEMBLY';
+    ? 'FOCUSING'
+    : 'ASSEMBLING';
 }
 
 /** 시작 시각 기준 종료 예정 시각 = startedAt + goalSeconds (AC-008: 이탈·화면 전환과 무관) */
