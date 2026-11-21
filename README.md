@@ -74,12 +74,14 @@ Swagger에서 요청·응답 예시를 보고 바로 호출할 수 있습니다.
 | POST | `/api/sessions` | 방 만들기 (목표 시간·정원 4~6명). 세션 코드와 개설자 `participantToken` 발급. 같은 `clientRequestId` 재전송은 기존 방 반환 | - | 201 | 400 |
 | POST | `/api/sessions/join` | 세션 코드로 입장. 참가자 `participantToken` 발급 | - | 201 | 400, 404, 409(시작됨·정원 참) |
 | GET | `/api/sessions/{sessionId}` | 세션 조회 (단계·남은 시간·인원·내 정보·명단 `participants`, `serverNow`) | O | 200 | 400, 401, 403, 404 |
+| PATCH | `/api/sessions/{sessionId}/image` | 방 이미지 지정 `{ imageId }` (방장, 시작 전). 업로드한 사진(`POST /api/images`의 `imageId`)이나 기본 이미지. 다시 보내면 바꿈 | O | 200 | 400, 401, 403, 404, 409 |
 | PATCH | `/api/sessions/{sessionId}/participants/me` | 닉네임 설정 `{ nickname }` (1~20자). 링크로 입장한 뒤 "참여하기"에서 호출. 명단은 세션 조회 `participants`(입장 순서·닉네임·방장 여부) | O | 200 | 400, 401, 403, 404 |
 | DELETE | `/api/sessions/{sessionId}/participants/me` | 대기실 나가기 (시작 전). 내 참가자 정보 삭제 → 토큰 무효·자리 비움. 방장이 나가면 다음 입장 순서가 방장, 마지막 한 명이면 방 삭제 | O | 200 | 400, 401, 403(다른 세션), 404, 409(시작됨) |
 | POST | `/api/sessions/{sessionId}/start` | 세션 시작 (개설자, **최소 4명**). 명단 고정, 시작·종료 시각 확정, 원조각(한 행 2명)·조립 조각(원조각당 4개) 생성. 다시 보내면 처음 결과 반환 | O | 200 | 400(인원 부족 포함), 401, 403, 404 |
 | POST | `/api/sessions/{sessionId}/end` | 공부 조기 종료 (방장). 종료 시각을 지금으로 당겨 모두 조립 단계로. 복원도는 원래 목표 기준. 재전송은 처음 결과 | O | 200 | 400, 401, 403, 404, 409(시작 전) |
 | POST | `/api/sessions/{sessionId}/heartbeat` | 연결 확인 (공부 중 주기적으로). 신호가 기준 시간(기본 90초) 넘게 없으면 마지막 확인 시각으로 복원도 고정 | O | 200 | 400, 401, 403, 404 |
 | GET | `/api/sessions/{sessionId}/board` | 진행판 (원조각 위치 번호·차지하는 칸 수 `colSpan`(5명일 때 5번만 2)·내 복원도. 집중 중 남의 복원도는 `null`=블러, 조립부터 공개) | O | 200 | 400, 401, 403, 404 |
+| GET | `/api/sessions/{sessionId}/pieces/{position}/image` | 조각 이미지 (직소 모양 투명 WebP). 내 조각은 선명, 남의 조각은 주인 복원도에 따라 블러 | O | 200 | 400, 401, 403, 404 |
 | GET | `/api/sessions/{sessionId}/assembly` | 조립판 조회. 집중 종료 후 첫 호출에 조립을 열고(최종 복원도 확정, 부재자 조각 자동 배치), 칸 배치(`slots`)·조각 목록 반환. 놓이기 전 정답 위치는 숨김 | O | 200 | 400, 401, 403, 404, 409(집중 중) |
 | PATCH | `/api/sessions/{sessionId}/assembly/pieces/{pieceId}` | 조각 놓기 `{ targetPosition }`. 자기 조각만, 정답 칸이면 저장(`correct: true`), 틀린·찬 칸이면 저장 안 함(직전 위치로 복귀). 모두 놓이면 팀 통과(`COMPLETED`) | O | 200 | 400, 401, 403, 404, 409 |
 | DELETE | `/api/sessions/{sessionId}` | 방 종료·폐기 (개설자). 세션·참가자·조각 전부 삭제, 이후 토큰 무효 | O | 200 | 400, 401, 403, 404 |
