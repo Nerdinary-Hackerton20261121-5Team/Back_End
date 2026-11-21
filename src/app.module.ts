@@ -4,6 +4,7 @@ import { createObserveModule } from '@nestjs/observe';
 import { CommonModule } from './common/common.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
+import { SessionsModule } from './sessions/sessions.module.js';
 import { StorageModule } from './storage/storage.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
@@ -22,6 +23,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       serviceId: 'Hackathon_Back',
     }),
     HealthModule,
+    SessionsModule,
     StorageModule,
   ],
 })
