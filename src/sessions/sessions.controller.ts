@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -20,7 +21,10 @@ import {
   ApiErrorResponses,
   ApiSuccessResponse,
 } from '../common/swagger/api-response.decorators.js';
+import { ImageDto } from '../storage/dto/image.dto.js';
+import { ImageErrors } from '../storage/images.errors.js';
 import { CreateSessionDto } from './dto/create-session.dto.js';
+import { SetSessionImageDto } from './dto/set-session-image.dto.js';
 import { JoinSessionDto } from './dto/join-session.dto.js';
 import {
   SessionDetailResponseDto,
@@ -135,6 +139,31 @@ export class SessionsController {
   )
   join(@Body() dto: JoinSessionDto): Promise<SessionEntryResponseDto> {
     return this.sessions.join(dto);
+  }
+
+  @Patch(':sessionId/image')
+  @ParticipantAuth()
+  @ApiOperation({
+    summary: '방 이미지 지정 (개설자, 시작 전)',
+    description:
+      '업로드한 사진(POST /images 응답의 imageId)이나 기본 이미지를 방 이미지로 정한다. 다시 보내면 바꾼다. ' +
+      '시작한 뒤에는 바꿀 수 없다(409). 다른 방이 쓰고 있는 업로드 이미지는 지정할 수 없다(409).',
+  })
+  @ApiSuccessResponse(ImageDto)
+  @ApiErrorResponses(
+    CommonErrors.INVALID_INPUT,
+    SessionErrors.NOT_CREATOR,
+    SessionErrors.SESSION_NOT_FOUND,
+    ImageErrors.IMAGE_NOT_FOUND,
+    SessionErrors.IMAGE_LOCKED_AFTER_START,
+    ImageErrors.IMAGE_IN_USE,
+  )
+  setImage(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @Body() dto: SetSessionImageDto,
+    @CurrentParticipant() me: RequestParticipant,
+  ): Promise<ImageDto> {
+    return this.sessions.setImage(sessionId, dto.imageId, me);
   }
 
   @Get(':sessionId')

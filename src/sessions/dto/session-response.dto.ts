@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ImageDto } from '../../storage/dto/image.dto.js';
 import {
   SESSION_STATUSES,
   type SessionStatus,
@@ -101,6 +102,13 @@ export class SessionDetailResponseDto {
     example: '2026-11-22T03:00:00.000Z',
   })
   serverNow: Date;
+
+  @ApiProperty({
+    type: ImageDto,
+    nullable: true,
+    description: '방 이미지. 아직 지정하지 않았으면 null',
+  })
+  image: ImageDto | null;
 
   @ApiProperty({ type: SessionMeDto })
   me: SessionMeDto;
