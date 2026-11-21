@@ -19,6 +19,7 @@ describe('요청 횟수 제한 (e2e)', () => {
     process.env.POLICY_THROTTLE_ENABLED = 'true';
     process.env.POLICY_THROTTLE_CREATE_LIMIT = '2';
     process.env.POLICY_THROTTLE_JOIN_LIMIT = '2';
+    process.env.POLICY_THROTTLE_UPLOAD_LIMIT = '2';
     process.env.POLICY_THROTTLE_DEFAULT_LIMIT = '3';
 
     const moduleRef = await Test.createTestingModule({
@@ -71,6 +72,16 @@ describe('요청 횟수 제한 (e2e)', () => {
     let other = ip();
     while (other === me) other = ip();
     expect((await create(other)).status).toBe(201);
+  });
+
+  it('이미지 업로드: 인증이 없으므로 IP별 한도를 넘으면 429 (파일 없는 400 요청도 센다)', async () => {
+    const me = ip();
+    const post = () => http().post('/api/images').set('CF-Connecting-IP', me);
+    expect((await post()).status).toBe(400);
+    expect((await post()).status).toBe(400);
+    const third = await post();
+    expect(third.status).toBe(429);
+    expect(third.body.code).toBe('TOO_MANY_REQUESTS');
   });
 
   it('입장: 한도를 넘으면 429 (없는 코드로 404가 나는 요청도 센다)', async () => {

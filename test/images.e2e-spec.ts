@@ -75,12 +75,11 @@ describe('이미지 업로드·방 이미지 지정 API (e2e)', () => {
     return { sessionId, members };
   }
 
-  async function upload(token: string) {
-    const res = await http()
-      .post('/api/images')
-      .set('X-Participant-Token', token)
-      .attach('file', PNG, 'a.png')
-      .expect(201);
+  /** 토큰은 필요 없다. 주면 그냥 무시된다 */
+  async function upload(token?: string) {
+    const req = http().post('/api/images');
+    if (token) req.set('X-Participant-Token', token);
+    const res = await req.attach('file', PNG, 'a.png').expect(201);
     images.push(res.body.data.imageId);
     return res.body.data as {
       imageId: number;
@@ -102,14 +101,25 @@ describe('이미지 업로드·방 이미지 지정 API (e2e)', () => {
       .set('X-Participant-Token', token)
       .expect(200);
 
-  it('401: 토큰 없이 업로드하면 저장하지 않는다', async () => {
-    const before = await dataSource.getRepository(Image).count();
+  it('방을 만들기 전에 토큰 없이 업로드 → 방 만들 때 imageId로 지정', async () => {
+    const uploaded = await upload();
+    expect(uploaded.source).toBe('UPLOAD');
+
     const res = await http()
-      .post('/api/images')
-      .attach('file', PNG, 'a.png')
-      .expect(401);
-    expect(res.body.code).toBe('TOKEN_REQUIRED');
-    expect(await dataSource.getRepository(Image).count()).toBe(before);
+      .post('/api/sessions')
+      .send({
+        goalSeconds: 60,
+        maxParticipants: 6,
+        clientRequestId: randomUUID(),
+        imageId: uploaded.imageId,
+      })
+      .expect(201);
+    sessions.push(res.body.data.sessionId);
+
+    const image = (
+      await detail(res.body.data.sessionId, res.body.data.participantToken)
+    ).body.data.image;
+    expect(image).toEqual(uploaded);
   });
 
   it('업로드 → images에 UPLOAD 행, 응답에 key 없음 → 개설자가 지정 → 세션 조회에 image', async () => {
